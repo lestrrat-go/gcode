@@ -1,6 +1,4 @@
-// Package scan provides a low-level line scanner and line parser for G-code.
-// It is an internal package used by the parent module's parser.
-package scan
+package gcode
 
 import (
 	"bufio"
@@ -9,25 +7,21 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	gcode "github.com/lestrrat-go/gcode"
 )
 
-// Scanner wraps bufio.Scanner with line number tracking.
-type Scanner struct {
+// lineScanner wraps bufio.Scanner with line number tracking.
+type lineScanner struct {
 	scanner *bufio.Scanner
 	lineNum int
 }
 
-// NewScanner returns a new Scanner that reads from r.
-func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{
+func newLineScanner(r io.Reader) *lineScanner {
+	return &lineScanner{
 		scanner: bufio.NewScanner(r),
 	}
 }
 
-// Scan advances to the next line and returns true if a line was read.
-func (s *Scanner) Scan() bool {
+func (s *lineScanner) scan() bool {
 	if s.scanner.Scan() {
 		s.lineNum++
 		return true
@@ -35,25 +29,22 @@ func (s *Scanner) Scan() bool {
 	return false
 }
 
-// Text returns the text of the current line.
-func (s *Scanner) Text() string {
+func (s *lineScanner) text() string {
 	return s.scanner.Text()
 }
 
-// LineNum returns the 1-based line number of the current line.
-func (s *Scanner) LineNum() int {
+func (s *lineScanner) lineNumber() int {
 	return s.lineNum
 }
 
-// Err returns the first non-EOF error encountered by the scanner.
-func (s *Scanner) Err() error {
+func (s *lineScanner) err() error {
 	return s.scanner.Err()
 }
 
-// ParseLine parses a single raw line of G-code into a gcode.Line value.
-// It does NOT do dialect validation -- that is the Parser's job.
-func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
-	line := gcode.Line{Raw: rawLine}
+// parseLine parses a single raw line of G-code into a Line value.
+// It does NOT do dialect validation — that is the Parser's job.
+func parseLine(rawLine string, lineNum int) (Line, error) {
+	line := Line{Raw: rawLine}
 	s := rawLine
 	pos := 0 // byte position in rawLine for error reporting
 
@@ -70,9 +61,9 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 	// 2. Semicolon comment-only line
 	if s[0] == ';' {
 		line.HasComment = true
-		line.Comment = gcode.Comment{
+		line.Comment = Comment{
 			Text: s[1:],
-			Form: gcode.CommentSemicolon,
+			Form: CommentSemicolon,
 		}
 		return line, nil
 	}
@@ -81,23 +72,20 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 	if s[0] == '(' {
 		end := strings.IndexByte(s, ')')
 		if end == -1 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s, fmt.Errorf("unclosed parenthesis comment"))
+			return Line{}, NewParseError(lineNum, pos+1, s, fmt.Errorf("unclosed parenthesis comment"))
 		}
 		// Check if the rest of the line (after closing paren) is only whitespace
 		rest := strings.TrimSpace(s[end+1:])
 		if len(rest) == 0 {
 			line.HasComment = true
-			line.Comment = gcode.Comment{
+			line.Comment = Comment{
 				Text: s[1:end],
-				Form: gcode.CommentParenthesis,
+				Form: CommentParenthesis,
 			}
 			return line, nil
 		}
 		// Not a comment-only line; fall through to command parsing
 	}
-
-	// Track where 'N' starts for checksum calculation
-	nStart := pos
 
 	// 4. Consume optional N<digits> line number prefix
 	if len(s) > 0 && (s[0] == 'N' || s[0] == 'n') {
@@ -106,11 +94,11 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 			i++
 		}
 		if i == 1 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after N"))
+			return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after N"))
 		}
 		n, err := strconv.Atoi(s[1:i])
 		if err != nil {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:i], fmt.Errorf("invalid line number: %w", err))
+			return Line{}, NewParseError(lineNum, pos+1, s[:i], fmt.Errorf("invalid line number: %w", err))
 		}
 		line.LineNumber = n
 		pos += i
@@ -121,17 +109,17 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 		s = trimmed
 	}
 
-	// If nothing left after line number, it's just a line number (unusual but valid blank-ish line)
+	// If nothing left after line number
 	if len(s) == 0 {
 		return line, nil
 	}
 
 	// 5. Consume command token: letter + integer [+ '.' + integer]
-	if !isLetter(s[0]) {
-		return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected command letter"))
+	if !scanIsLetter(s[0]) {
+		return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected command letter"))
 	}
 
-	cmdLetter := toUpper(s[0])
+	cmdLetter := scanToUpper(s[0])
 	s = s[1:]
 	pos++
 
@@ -141,13 +129,13 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 		i++
 	}
 	if i == 0 {
-		return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after command letter %c", cmdLetter))
+		return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after command letter %c", cmdLetter))
 	}
 	cmdNum, _ := strconv.Atoi(s[:i])
 	pos += i
 	s = s[i:]
 
-	cmd := gcode.Command{
+	cmd := Command{
 		Letter: cmdLetter,
 		Number: cmdNum,
 	}
@@ -161,7 +149,7 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 			j++
 		}
 		if j == 0 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after '.' in subcode"))
+			return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after '.' in subcode"))
 		}
 		sub, _ := strconv.Atoi(s[:j])
 		cmd.HasSubcode = true
@@ -171,7 +159,7 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 	}
 
 	// 7. Consume zero or more parameter tokens
-	var params []gcode.Parameter
+	var params []Parameter
 	for {
 		// Skip whitespace
 		trimmed = strings.TrimLeftFunc(s, unicode.IsSpace)
@@ -188,24 +176,24 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 		}
 
 		// Must be a letter for a parameter
-		if !isLetter(s[0]) {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("unexpected character %q", s[0]))
+		if !scanIsLetter(s[0]) {
+			return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("unexpected character %q", s[0]))
 		}
 
-		paramLetter := toUpper(s[0])
+		paramLetter := scanToUpper(s[0])
 		s = s[1:]
 		pos++
 
 		// Try to parse numeric value; if next char is not numeric, value is 0 (flag-style)
 		var value float64
 		if len(s) > 0 && (s[0] == '-' || s[0] == '+' || s[0] == '.' || (s[0] >= '0' && s[0] <= '9')) {
-			numStr, numLen := consumeNumber(s)
+			numStr, numLen := scanConsumeNumber(s)
 			if numLen == 0 {
-				return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("invalid number after parameter %c", paramLetter))
+				return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("invalid number after parameter %c", paramLetter))
 			}
 			v, err := strconv.ParseFloat(numStr, 64)
 			if err != nil {
-				return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, numStr, fmt.Errorf("invalid parameter value: %w", err))
+				return Line{}, NewParseError(lineNum, pos+1, numStr, fmt.Errorf("invalid parameter value: %w", err))
 			}
 			value = v
 			pos += numLen
@@ -213,7 +201,7 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 		}
 		// else: flag-style parameter, value stays 0
 
-		params = append(params, gcode.Parameter{Letter: paramLetter, Value: value})
+		params = append(params, Parameter{Letter: paramLetter, Value: value})
 	}
 	cmd.Params = params
 	line.HasCommand = true
@@ -230,7 +218,7 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 	if len(s) > 0 && s[0] == '(' {
 		end := strings.IndexByte(s, ')')
 		if end == -1 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("unclosed parenthesis comment"))
+			return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("unclosed parenthesis comment"))
 		}
 		parenComment = s[1:end]
 		hasParenComment = true
@@ -255,15 +243,15 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 	// 10. If both comments: keep semicolon, discard parenthesis
 	if hasSemiComment {
 		line.HasComment = true
-		line.Comment = gcode.Comment{
+		line.Comment = Comment{
 			Text: semiComment,
-			Form: gcode.CommentSemicolon,
+			Form: CommentSemicolon,
 		}
 	} else if hasParenComment {
 		line.HasComment = true
-		line.Comment = gcode.Comment{
+		line.Comment = Comment{
 			Text: parenComment,
-			Form: gcode.CommentParenthesis,
+			Form: CommentParenthesis,
 		}
 	}
 
@@ -281,63 +269,52 @@ func ParseLine(rawLine string, lineNum int) (gcode.Line, error) {
 			j++
 		}
 		if j == 0 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after '*' for checksum"))
+			return Line{}, NewParseError(lineNum, pos+1, s[:min(len(s), 10)], fmt.Errorf("expected digits after '*' for checksum"))
 		}
 		csVal, err := strconv.Atoi(s[:j])
 		if err != nil || csVal < 0 || csVal > 255 {
-			return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, s[:j], fmt.Errorf("invalid checksum value"))
+			return Line{}, NewParseError(lineNum, pos+1, s[:j], fmt.Errorf("invalid checksum value"))
 		}
 		line.HasChecksum = true
 		line.Checksum = byte(csVal)
 		s = s[j:]
 	}
 
-	// Compute checksum range: from 'N' (or first non-whitespace if no N) to '*'
-	// The checksum in the line should match XOR of bytes from nStart to '*'
-	_ = nStart // used for checksum verification if needed in future
-
 	// Remaining should be whitespace only
 	rest := strings.TrimSpace(s)
 	if len(rest) > 0 {
-		return gcode.Line{}, gcode.NewParseError(lineNum, pos+1, rest[:min(len(rest), 10)], fmt.Errorf("unexpected trailing content"))
+		return Line{}, NewParseError(lineNum, pos+1, rest[:min(len(rest), 10)], fmt.Errorf("unexpected trailing content"))
 	}
 
 	return line, nil
 }
 
-// consumeNumber reads a numeric literal (integer or float, optionally negative)
-// from the start of s and returns the string and its length in bytes.
-func consumeNumber(s string) (string, int) {
+func scanConsumeNumber(s string) (string, int) {
 	i := 0
-	// Optional sign
 	if i < len(s) && (s[i] == '-' || s[i] == '+') {
 		i++
 	}
-	// Integer part
 	start := i
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 		i++
 	}
-	// Optional fractional part
 	if i < len(s) && s[i] == '.' {
 		i++
 		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 			i++
 		}
 	}
-	// Must have consumed at least one digit
 	if i == start {
-		// Only a sign (or nothing), no digits
 		return "", 0
 	}
 	return s[:i], i
 }
 
-func isLetter(b byte) bool {
+func scanIsLetter(b byte) bool {
 	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
 }
 
-func toUpper(b byte) byte {
+func scanToUpper(b byte) byte {
 	if b >= 'a' && b <= 'z' {
 		return b - 32
 	}

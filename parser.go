@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/lestrrat-go/gcode/internal/scan"
 )
 
 // Parser holds configuration for a parse operation.
@@ -22,9 +20,12 @@ func NewParser(options ...ParseOption) *Parser {
 	for _, opt := range options {
 		switch opt.Ident() {
 		case identDialect{}:
-			var d *Dialect
-			_ = opt.Value(&d)
-			p.dialect = d
+			var d any
+			if err := opt.Value(&d); err == nil {
+				if dialect, ok := d.(*Dialect); ok {
+					p.dialect = dialect
+				}
+			}
 		case identStrict{}:
 			_ = opt.Value(&p.strict)
 		}
@@ -35,11 +36,11 @@ func NewParser(options ...ParseOption) *Parser {
 // Parse reads G-code from src and returns an immutable Program.
 // In strict mode with a dialect, unknown commands produce an error.
 func (p *Parser) Parse(src io.Reader) (*Program, error) {
-	sc := scan.NewScanner(src)
+	sc := newLineScanner(src)
 	pb := NewProgramBuilder()
 
-	for sc.Scan() {
-		line, err := scan.ParseLine(sc.Text(), sc.LineNum())
+	for sc.scan() {
+		line, err := parseLine(sc.text(), sc.lineNumber())
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +52,7 @@ func (p *Parser) Parse(src io.Reader) (*Program, error) {
 				subcode = cmd.Subcode
 			}
 			if _, ok := p.dialect.LookupCommand(cmd.Letter, cmd.Number, subcode); !ok {
-				return nil, NewParseError(sc.LineNum(), 1, sc.Text(),
+				return nil, NewParseError(sc.lineNumber(), 1, sc.text(),
 					fmt.Errorf("unknown command %c%d in dialect %s", cmd.Letter, cmd.Number, p.dialect.Name()))
 			}
 		}
@@ -59,7 +60,7 @@ func (p *Parser) Parse(src io.Reader) (*Program, error) {
 		pb.Append(line)
 	}
 
-	if err := sc.Err(); err != nil {
+	if err := sc.err(); err != nil {
 		return nil, err
 	}
 
