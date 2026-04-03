@@ -1,3 +1,13 @@
+// Package gcode provides a parser and generator for G-code, the control
+// language used by CNC machines and 3D printers.
+//
+// Use [Parse] or [ParseString] to parse G-code into an immutable [Program],
+// and [Generate] or [GenerateString] to serialize it back. Programs are built
+// manually with [ProgramBuilder]. A [MacroRegistry] lets you define named
+// command sequences that can be expanded on demand.
+//
+// Dialect-aware parsing is available via the [Dialect] interface and the
+// built-in Marlin and RepRap dialects in sub-packages.
 package gcode
 
 import (
