@@ -57,6 +57,12 @@ func (e *parseError) Column() int { return e.column }
 // Text returns the offending text excerpt.
 func (e *parseError) Text() string { return e.text }
 
+// NewParseError creates a parse error with location details. It is intended
+// for use by internal packages that cannot access makeParseError directly.
+func NewParseError(line, col int, text string, err error) error {
+	return makeParseError(line, col, text, err)
+}
+
 // makeParseError is the private constructor for parse errors.
 func makeParseError(line, col int, text string, err error) *parseError {
 	return &parseError{
