@@ -47,6 +47,12 @@ type identEmitLineNumbers struct{}
 type identComputeChecksum struct{}
 type identLineEnding struct{}
 
+// WithDialect returns an option that associates a dialect with a parse or
+// generate operation.
+func WithDialect(d *Dialect) Option {
+	return &sharedOption{option.New(identDialect{}, d)}
+}
+
 // LineEnding represents the line ending style used during G-code generation.
 type LineEnding int
 
