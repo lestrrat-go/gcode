@@ -107,8 +107,8 @@ func (b *CommandBuilder) ParenComment(text string) *CommandBuilder {
 	return b
 }
 
-// Line produces the final Line value from the builder.
-func (b *CommandBuilder) Line() Line {
+// Build produces the final Line value from the builder.
+func (b *CommandBuilder) Build() Line {
 	return Line{
 		HasCommand: true,
 		Command:    b.cmd,

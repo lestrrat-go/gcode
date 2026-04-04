@@ -8,16 +8,16 @@ type ParseOption interface {
 	parseOption()
 }
 
-// GenerateOption is an option that can be passed to generation functions.
-type GenerateOption interface {
+// FormatOption is an option that can be passed to generation functions.
+type FormatOption interface {
 	option.Interface
-	generateOption()
+	formatOption()
 }
 
-// Option satisfies both ParseOption and GenerateOption.
+// Option satisfies both ParseOption and FormatOption.
 type Option interface {
 	ParseOption
-	GenerateOption
+	FormatOption
 }
 
 type parseOption struct {
@@ -26,18 +26,18 @@ type parseOption struct {
 
 func (*parseOption) parseOption() {}
 
-type generateOption struct {
+type formatOption struct {
 	option.Interface
 }
 
-func (*generateOption) generateOption() {}
+func (*formatOption) formatOption() {}
 
 type sharedOption struct {
 	option.Interface
 }
 
 func (*sharedOption) parseOption()    {}
-func (*sharedOption) generateOption() {}
+func (*sharedOption) formatOption() {}
 
 // Ident types for option identification.
 type identDialect struct{}

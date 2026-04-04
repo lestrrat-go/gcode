@@ -3,22 +3,23 @@ package gcode_test
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/gcode"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateLine_BlankLine(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_BlankLine(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
-	err := g.GenerateLine(&buf, gcode.Line{})
+	err := g.FormatLine(&buf, gcode.Line{})
 	require.NoError(t, err)
 	require.Equal(t, "", buf.String())
 }
 
-func TestGenerateLine_CommentOnlySemicolon(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommentOnlySemicolon(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasComment: true,
@@ -27,13 +28,13 @@ func TestGenerateLine_CommentOnlySemicolon(t *testing.T) {
 			Form: gcode.CommentSemicolon,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, ";comment text", buf.String())
 }
 
-func TestGenerateLine_CommentOnlyParenthesis(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommentOnlyParenthesis(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasComment: true,
@@ -42,13 +43,13 @@ func TestGenerateLine_CommentOnlyParenthesis(t *testing.T) {
 			Form: gcode.CommentParenthesis,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "(comment text)", buf.String())
 }
 
-func TestGenerateLine_EmitCommentsFalse(t *testing.T) {
-	g := gcode.NewGenerator(gcode.WithEmitComments(false))
+func TestFormatLine_EmitCommentsFalse(t *testing.T) {
+	g := gcode.NewFormatter(gcode.WithEmitComments(false))
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -62,13 +63,13 @@ func TestGenerateLine_EmitCommentsFalse(t *testing.T) {
 			Form: gcode.CommentSemicolon,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G28", buf.String())
 }
 
-func TestGenerateLine_SimpleCommand(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_SimpleCommand(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -81,13 +82,13 @@ func TestGenerateLine_SimpleCommand(t *testing.T) {
 			},
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G0 X10 Y20", buf.String())
 }
 
-func TestGenerateLine_CommandWithSubcode(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommandWithSubcode(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -98,13 +99,13 @@ func TestGenerateLine_CommandWithSubcode(t *testing.T) {
 			HasSubcode: true,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G92.1", buf.String())
 }
 
-func TestGenerateLine_CommandWithFloatParams(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommandWithFloatParams(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -119,13 +120,13 @@ func TestGenerateLine_CommandWithFloatParams(t *testing.T) {
 			},
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G1 X10.5 Y-3.2 E0.04 F1200", buf.String())
 }
 
-func TestGenerateLine_LineNumbersEnabled(t *testing.T) {
-	g := gcode.NewGenerator(gcode.WithEmitLineNumbers(true))
+func TestFormatLine_LineNumbersEnabled(t *testing.T) {
+	g := gcode.NewFormatter(gcode.WithEmitLineNumbers(true))
 	var buf bytes.Buffer
 	line := gcode.Line{
 		LineNumber: 100,
@@ -139,13 +140,13 @@ func TestGenerateLine_LineNumbersEnabled(t *testing.T) {
 			},
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "N100 G1 X10 Y20", buf.String())
 }
 
-func TestGenerateLine_LineNumbersDisabled(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_LineNumbersDisabled(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		LineNumber: 100,
@@ -159,13 +160,13 @@ func TestGenerateLine_LineNumbersDisabled(t *testing.T) {
 			},
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G1 X10 Y20", buf.String())
 }
 
-func TestGenerateLine_Checksum(t *testing.T) {
-	g := gcode.NewGenerator(gcode.WithEmitLineNumbers(true), gcode.WithComputeChecksum(true))
+func TestFormatLine_Checksum(t *testing.T) {
+	g := gcode.NewFormatter(gcode.WithEmitLineNumbers(true), gcode.WithComputeChecksum(true))
 	var buf bytes.Buffer
 	line := gcode.Line{
 		LineNumber: 100,
@@ -179,7 +180,7 @@ func TestGenerateLine_Checksum(t *testing.T) {
 			},
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 
 	// Compute expected checksum: XOR all bytes of "N100 G1 X10 Y20"
@@ -192,8 +193,8 @@ func TestGenerateLine_Checksum(t *testing.T) {
 	require.Equal(t, expected, buf.String())
 }
 
-func TestGenerateLine_CRLFLineEnding(t *testing.T) {
-	g := gcode.NewGenerator(gcode.WithLineEnding(gcode.LineEndingCRLF))
+func TestFormatLine_CRLFLineEnding(t *testing.T) {
+	g := gcode.NewFormatter(gcode.WithLineEnding(gcode.LineEndingCRLF))
 
 	pb := gcode.NewProgramBuilder()
 	pb.Append(
@@ -209,13 +210,13 @@ func TestGenerateLine_CRLFLineEnding(t *testing.T) {
 	prog := pb.Build()
 
 	var buf bytes.Buffer
-	err := g.Generate(&buf, prog)
+	err := g.Format(&buf, prog)
 	require.NoError(t, err)
 	require.Equal(t, "G0\r\nG1\r\n", buf.String())
 }
 
-func TestGenerateLine_LFLineEnding(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_LFLineEnding(t *testing.T) {
+	g := gcode.NewFormatter()
 
 	pb := gcode.NewProgramBuilder()
 	pb.Append(
@@ -231,31 +232,23 @@ func TestGenerateLine_LFLineEnding(t *testing.T) {
 	prog := pb.Build()
 
 	var buf bytes.Buffer
-	err := g.Generate(&buf, prog)
+	err := g.Format(&buf, prog)
 	require.NoError(t, err)
 	require.Equal(t, "G0\nG1\n", buf.String())
 }
 
-func TestGenerateString(t *testing.T) {
+func TestFormat_String(t *testing.T) {
 	pb := gcode.NewProgramBuilder()
-	pb.Append(gcode.Line{
-		HasCommand: true,
-		Command: gcode.Command{
-			Letter: 'G',
-			Number: 0,
-			Params: []gcode.Parameter{
-				{Letter: 'X', Value: 10},
-			},
-		},
-	})
+	pb.Append(gcode.G(0).X(10).Build())
 	prog := pb.Build()
 
-	s, err := gcode.GenerateString(prog)
+	var sb strings.Builder
+	err := gcode.Format(&sb, prog)
 	require.NoError(t, err)
-	require.Equal(t, "G0 X10\n", s)
+	require.Equal(t, "G0 X10\n", sb.String())
 }
 
-func TestGenerate_MultipleLines(t *testing.T) {
+func TestFormat_MultipleLines(t *testing.T) {
 	pb := gcode.NewProgramBuilder()
 	pb.Append(
 		gcode.Line{
@@ -281,14 +274,14 @@ func TestGenerate_MultipleLines(t *testing.T) {
 	prog := pb.Build()
 
 	var buf bytes.Buffer
-	g := gcode.NewGenerator()
-	err := g.Generate(&buf, prog)
+	g := gcode.NewFormatter()
+	err := g.Format(&buf, prog)
 	require.NoError(t, err)
 	require.Equal(t, "G28\n\nG1 X10 Y20\n", buf.String())
 }
 
-func TestGenerateLine_CommandWithTrailingSemicolonComment(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommandWithTrailingSemicolonComment(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -306,13 +299,13 @@ func TestGenerateLine_CommandWithTrailingSemicolonComment(t *testing.T) {
 			Form: gcode.CommentSemicolon,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G28 X0 Y0 ;home", buf.String())
 }
 
-func TestGenerateLine_CommandWithTrailingParenComment(t *testing.T) {
-	g := gcode.NewGenerator()
+func TestFormatLine_CommandWithTrailingParenComment(t *testing.T) {
+	g := gcode.NewFormatter()
 	var buf bytes.Buffer
 	line := gcode.Line{
 		HasCommand: true,
@@ -330,7 +323,7 @@ func TestGenerateLine_CommandWithTrailingParenComment(t *testing.T) {
 			Form: gcode.CommentParenthesis,
 		},
 	}
-	err := g.GenerateLine(&buf, line)
+	err := g.FormatLine(&buf, line)
 	require.NoError(t, err)
 	require.Equal(t, "G28 X0 Y0 (home)", buf.String())
 }

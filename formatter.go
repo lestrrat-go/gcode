@@ -6,20 +6,20 @@ import (
 	"strings"
 )
 
-// Generator holds configuration for a generate operation.
-// Use NewGenerator to create one with the desired options.
-type Generator struct {
+// Formatter holds configuration for a generate operation.
+// Use NewFormatter to create one with the desired options.
+type Formatter struct {
 	emitComments    bool
 	emitLineNumbers bool
 	computeChecksum bool
 	lineEnding      LineEnding
 }
 
-// NewGenerator returns a Generator configured with the given options.
+// NewFormatter returns a Formatter configured with the given options.
 // Defaults: emitComments=true, emitLineNumbers=false,
 // computeChecksum=false, lineEnding=LineEndingLF.
-func NewGenerator(options ...GenerateOption) *Generator {
-	g := &Generator{
+func NewFormatter(options ...FormatOption) *Formatter {
+	g := &Formatter{
 		emitComments: true,
 		lineEnding:   LineEndingLF,
 	}
@@ -38,9 +38,9 @@ func NewGenerator(options ...GenerateOption) *Generator {
 	return g
 }
 
-// GenerateLine writes a single Line to w WITHOUT a trailing line ending.
-// Callers using GenerateLine directly must append their own line endings.
-func (g *Generator) GenerateLine(w io.Writer, line Line) error {
+// FormatLine writes a single Line to w WITHOUT a trailing line ending.
+// Callers using FormatLine directly must append their own line endings.
+func (g *Formatter) FormatLine(w io.Writer, line Line) error {
 	if line.IsBlank() {
 		return nil
 	}
@@ -116,10 +116,10 @@ func (g *Generator) GenerateLine(w io.Writer, line Line) error {
 	return err
 }
 
-// Generate writes the G-code representation of prog to w.
+// Format writes the G-code representation of prog to w.
 // Each line is followed by the configured line ending.
 // Blank lines emit only the line ending.
-func (g *Generator) Generate(w io.Writer, prog *Program) error {
+func (g *Formatter) Format(w io.Writer, prog *Program) error {
 	var le string
 	switch g.lineEnding {
 	case LineEndingCRLF:
@@ -130,7 +130,7 @@ func (g *Generator) Generate(w io.Writer, prog *Program) error {
 
 	for i := range prog.Len() {
 		line := prog.Line(i)
-		if err := g.GenerateLine(w, line); err != nil {
+		if err := g.FormatLine(w, line); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, le); err != nil {

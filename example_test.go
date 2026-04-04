@@ -2,6 +2,7 @@ package gcode_test
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lestrrat-go/gcode"
 )
@@ -40,11 +41,11 @@ func Example_generate() {
 		).
 		Build()
 
-	s, err := gcode.GenerateString(prog)
-	if err != nil {
+	var sb strings.Builder
+	if err := gcode.Format(&sb, prog); err != nil {
 		panic(err)
 	}
-	fmt.Print(s)
+	fmt.Print(sb.String())
 	// Output:
 	// G28
 	// G1 X10 Y20

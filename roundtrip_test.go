@@ -3,6 +3,7 @@ package gcode_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/gcode"
@@ -42,7 +43,7 @@ func TestRoundTrip(t *testing.T) {
 	tests := []struct {
 		name    string
 		file    string
-		genOpts []gcode.GenerateOption
+		fmtOpts []gcode.FormatOption
 	}{
 		{
 			name: "marlin_start",
@@ -51,7 +52,7 @@ func TestRoundTrip(t *testing.T) {
 		{
 			name: "line_numbers",
 			file: "line_numbers.gcode",
-			genOpts: []gcode.GenerateOption{
+			fmtOpts: []gcode.FormatOption{
 				gcode.WithEmitLineNumbers(true),
 				gcode.WithComputeChecksum(true),
 			},
@@ -71,9 +72,10 @@ func TestRoundTrip(t *testing.T) {
 			prog1, err := gcode.ParseBytes(data)
 			require.NoError(t, err)
 
-			// Generate
-			output, err := gcode.GenerateString(prog1, tt.genOpts...)
-			require.NoError(t, err)
+			// Format
+			var sb strings.Builder
+			require.NoError(t, gcode.Format(&sb, prog1, tt.fmtOpts...))
+			output := sb.String()
 			require.NotEmpty(t, output)
 
 			// Second parse

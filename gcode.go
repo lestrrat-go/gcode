@@ -1,8 +1,8 @@
-// Package gcode provides a parser and generator for G-code, the control
+// Package gcode provides a parser and formatter for G-code, the control
 // language used by CNC machines and 3D printers.
 //
 // Use [Parse] or [ParseString] to parse G-code into an immutable [Program],
-// and [Generate] or [GenerateString] to serialize it back. Programs are built
+// and [Format] or [NewFormatter] to serialize it back. Programs are built
 // manually with [ProgramBuilder]. A [MacroRegistry] lets you define named
 // command sequences that can be expanded on demand.
 //
@@ -11,9 +11,7 @@
 package gcode
 
 import (
-	"bytes"
 	"io"
-	"strings"
 )
 
 // Parse reads G-code from src and returns an immutable Program.
@@ -34,26 +32,10 @@ func ParseBytes(src []byte, options ...ParseOption) (*Program, error) {
 	return p.ParseBytes(src)
 }
 
-// Generate writes the G-code representation of prog to w using the given options.
-func Generate(w io.Writer, prog *Program, options ...GenerateOption) error {
-	g := NewGenerator(options...)
-	return g.Generate(w, prog)
+// Format writes the G-code representation of prog to w using the given options.
+func Format(w io.Writer, prog *Program, options ...FormatOption) error {
+	f := NewFormatter(options...)
+	return f.Format(w, prog)
 }
 
-// GenerateString returns the G-code representation of prog as a string.
-func GenerateString(prog *Program, options ...GenerateOption) (string, error) {
-	var sb strings.Builder
-	if err := Generate(&sb, prog, options...); err != nil {
-		return "", err
-	}
-	return sb.String(), nil
-}
 
-// GenerateBytes returns the G-code representation of prog as a byte slice.
-func GenerateBytes(prog *Program, options ...GenerateOption) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := Generate(&buf, prog, options...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}

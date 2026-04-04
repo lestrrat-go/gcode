@@ -2,6 +2,7 @@ package examples_test
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/lestrrat-go/gcode"
 )
@@ -18,22 +19,8 @@ func (tempMacro) Expand(args map[string]float64) ([]gcode.Line, error) {
 		return nil, fmt.Errorf("missing required arg: temp")
 	}
 	return []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 104,
-				Params: []gcode.Parameter{{Letter: 'S', Value: temp}},
-			},
-		},
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 109,
-				Params: []gcode.Parameter{{Letter: 'S', Value: temp}},
-			},
-		},
+		gcode.M(104).S(temp).Build(),
+		gcode.M(109).S(temp).Build(),
 	}, nil
 }
 
@@ -46,7 +33,7 @@ func ExampleMacro_custom() {
 		panic(err)
 	}
 
-	gen := gcode.NewGenerator()
+	gen := gcode.NewFormatter()
 	for _, l := range lines {
 		var sb fmt.Stringer = &lineStringer{gen: gen, line: l}
 		fmt.Println(sb.String())
@@ -59,13 +46,13 @@ func ExampleMacro_custom() {
 
 // lineStringer formats a line using a generator.
 type lineStringer struct {
-	gen  *gcode.Generator
+	gen  *gcode.Formatter
 	line gcode.Line
 }
 
 func (ls *lineStringer) String() string {
 	var sb stringBuilder
-	if err := ls.gen.GenerateLine(&sb, ls.line); err != nil {
+	if err := ls.gen.FormatLine(&sb, ls.line); err != nil {
 		return fmt.Sprintf("<error: %v>", err)
 	}
 	return sb.String()
@@ -87,38 +74,10 @@ func (s *stringBuilder) String() string {
 func ExampleNewSimpleMacro() {
 	// A fixed preheat-PLA macro
 	macro := gcode.NewSimpleMacro("preheat-pla", []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 140,
-				Params: []gcode.Parameter{{Letter: 'S', Value: 60}},
-			},
-		},
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 104,
-				Params: []gcode.Parameter{{Letter: 'S', Value: 200}},
-			},
-		},
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 190,
-				Params: []gcode.Parameter{{Letter: 'S', Value: 60}},
-			},
-		},
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 109,
-				Params: []gcode.Parameter{{Letter: 'S', Value: 200}},
-			},
-		},
+		gcode.M(140).S(60).Build(),
+		gcode.M(104).S(200).Build(),
+		gcode.M(190).S(60).Build(),
+		gcode.M(109).S(200).Build(),
 	})
 
 	fmt.Printf("name: %s\n", macro.Name())
@@ -130,11 +89,11 @@ func ExampleNewSimpleMacro() {
 	}
 
 	prog := gcode.NewProgramBuilder().Append(lines...).Build()
-	s, err := gcode.GenerateString(prog)
-	if err != nil {
+	var sb strings.Builder
+	if err := gcode.Format(&sb, prog); err != nil {
 		panic(err)
 	}
-	fmt.Print(s)
+	fmt.Print(sb.String())
 	// Output:
 	// name: preheat-pla
 	// M140 S60
@@ -148,10 +107,7 @@ func ExampleMacroRegistry() {
 
 	// Register a simple macro
 	reg.Register(gcode.NewSimpleMacro("home-all", []gcode.Line{
-		{
-			HasCommand: true,
-			Command:    gcode.Command{Letter: 'G', Number: 28},
-		},
+		gcode.G(28).Build(),
 	}))
 
 	// Register a custom macro

@@ -17,9 +17,9 @@ func ExampleParse_roundtrip() {
 		panic(err)
 	}
 
-	// Generate back to io.Writer
+	// Format back to io.Writer
 	var buf bytes.Buffer
-	if err := gcode.Generate(&buf, prog); err != nil {
+	if err := gcode.Format(&buf, prog); err != nil {
 		panic(err)
 	}
 
