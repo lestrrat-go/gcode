@@ -16,34 +16,29 @@ var dialect = build()
 func Dialect() *gcode.Dialect { return dialect }
 
 func build() *gcode.Dialect {
-	d := gcode.NewDialect("marlin")
-
-	xyze := []gcode.ParamDef{{Key: "X"}, {Key: "Y"}, {Key: "Z"}, {Key: "E"}, {Key: "F"}}
-
-	d.Register(gcode.CommandDef{Name: "G0", Description: "rapid move", Params: xyze})
-	d.Register(gcode.CommandDef{Name: "G1", Description: "linear move", Params: xyze})
-	d.Register(gcode.CommandDef{Name: "G4", Description: "dwell", Params: []gcode.ParamDef{{Key: "P"}, {Key: "S"}}})
-	d.Register(gcode.CommandDef{Name: "G28", Description: "auto home", Params: []gcode.ParamDef{{Key: "X"}, {Key: "Y"}, {Key: "Z"}}})
-	d.Register(gcode.CommandDef{Name: "G29", Description: "bed levelling"})
-	d.Register(gcode.CommandDef{Name: "G92", Description: "set position", Params: []gcode.ParamDef{{Key: "X"}, {Key: "Y"}, {Key: "Z"}, {Key: "E"}}})
-	d.Register(gcode.CommandDef{Name: "G92.1", Description: "reset position offset", Params: []gcode.ParamDef{}})
-
-	d.Register(gcode.CommandDef{Name: "M82", Description: "absolute E", Params: []gcode.ParamDef{}})
-	d.Register(gcode.CommandDef{Name: "M83", Description: "relative E", Params: []gcode.ParamDef{}})
-	d.Register(gcode.CommandDef{Name: "M104", Description: "set hotend temp", Params: []gcode.ParamDef{{Key: "S", Required: true}, {Key: "T"}}})
-	d.Register(gcode.CommandDef{Name: "M105", Description: "report temp", Params: []gcode.ParamDef{}})
-	d.Register(gcode.CommandDef{Name: "M106", Description: "fan on", Params: []gcode.ParamDef{{Key: "S"}, {Key: "P"}}})
-	d.Register(gcode.CommandDef{Name: "M107", Description: "fan off", Params: []gcode.ParamDef{{Key: "P"}}})
-	d.Register(gcode.CommandDef{Name: "M109", Description: "wait hotend", Params: []gcode.ParamDef{{Key: "S", Required: true}, {Key: "R"}, {Key: "T"}}})
-	d.Register(gcode.CommandDef{Name: "M140", Description: "set bed temp", Params: []gcode.ParamDef{{Key: "S", Required: true}}})
-	d.Register(gcode.CommandDef{Name: "M190", Description: "wait bed", Params: []gcode.ParamDef{{Key: "S", Required: true}, {Key: "R"}}})
-	d.Register(gcode.CommandDef{Name: "M204", Description: "set accel", Params: []gcode.ParamDef{{Key: "P"}, {Key: "R"}, {Key: "T"}}})
-	d.Register(gcode.CommandDef{Name: "M220", Description: "feed rate %", Params: []gcode.ParamDef{{Key: "S"}}})
-	d.Register(gcode.CommandDef{Name: "M221", Description: "flow rate %", Params: []gcode.ParamDef{{Key: "S"}}})
+	d := gcode.NewDialect("marlin").
+		Register(gcode.NewCommand("G0").Describe("rapid move").Optional("X", "Y", "Z", "E", "F")).
+		Register(gcode.NewCommand("G1").Describe("linear move").Optional("X", "Y", "Z", "E", "F")).
+		Register(gcode.NewCommand("G4").Describe("dwell").Optional("P", "S")).
+		Register(gcode.NewCommand("G28").Describe("auto home").Optional("X", "Y", "Z")).
+		Register(gcode.NewCommand("G29").Describe("bed levelling")).
+		Register(gcode.NewCommand("G92").Describe("set position").Optional("X", "Y", "Z", "E")).
+		Register(gcode.NewCommand("G92.1").Describe("reset position offset")).
+		Register(gcode.NewCommand("M82").Describe("absolute E")).
+		Register(gcode.NewCommand("M83").Describe("relative E")).
+		Register(gcode.NewCommand("M104").Describe("set hotend temp").Required("S").Optional("T")).
+		Register(gcode.NewCommand("M105").Describe("report temp")).
+		Register(gcode.NewCommand("M106").Describe("fan on").Optional("S", "P")).
+		Register(gcode.NewCommand("M107").Describe("fan off").Optional("P")).
+		Register(gcode.NewCommand("M109").Describe("wait hotend").Required("S").Optional("R", "T")).
+		Register(gcode.NewCommand("M140").Describe("set bed temp").Required("S")).
+		Register(gcode.NewCommand("M190").Describe("wait bed").Required("S").Optional("R")).
+		Register(gcode.NewCommand("M204").Describe("set accel").Optional("P", "R", "T")).
+		Register(gcode.NewCommand("M220").Describe("feed rate %").Optional("S")).
+		Register(gcode.NewCommand("M221").Describe("flow rate %").Optional("S"))
 
 	for i := range 6 {
-		d.Register(gcode.CommandDef{Name: "T" + strconv.Itoa(i), Description: "tool select", Params: []gcode.ParamDef{}})
+		d.Register(gcode.NewCommand("T" + strconv.Itoa(i)).Describe("tool select"))
 	}
-
 	return d
 }

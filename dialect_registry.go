@@ -15,12 +15,14 @@ func NewDialectRegistry() *DialectRegistry {
 	}
 }
 
-// Register adds a dialect to the registry, keyed by its name.
-// If a dialect with the same name already exists, it is overwritten.
-func (r *DialectRegistry) Register(d *Dialect) {
+// Register adds a dialect to the registry keyed by its name and
+// returns r so calls can be chained. If a dialect with the same name
+// already exists it is overwritten.
+func (r *DialectRegistry) Register(d *Dialect) *DialectRegistry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.dialects[d.Name()] = d
+	return r
 }
 
 // Lookup returns the dialect with the given name. The second return value

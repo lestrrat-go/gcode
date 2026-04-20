@@ -43,54 +43,47 @@ var dialect = build()
 func Dialect() *gcode.Dialect { return dialect }
 
 func build() *gcode.Dialect {
-	d := marlin.Dialect().Extend("klipper")
-
-	d.Register(gcode.CommandDef{Name: "SET_PRESSURE_ADVANCE", Description: "set extruder pressure advance", Params: []gcode.ParamDef{{Key: "ADVANCE"}, {Key: "SMOOTH_TIME"}, {Key: "EXTRUDER"}}})
-	d.Register(gcode.CommandDef{Name: "SET_VELOCITY_LIMIT", Description: "set kinematic limits", Params: []gcode.ParamDef{{Key: "VELOCITY"}, {Key: "ACCEL"}, {Key: "ACCEL_TO_DECEL"}, {Key: "SQUARE_CORNER_VELOCITY"}}})
-	d.Register(gcode.CommandDef{Name: "SAVE_GCODE_STATE", Description: "snapshot tool state", Params: []gcode.ParamDef{{Key: "NAME"}}})
-	d.Register(gcode.CommandDef{Name: "RESTORE_GCODE_STATE", Description: "restore tool state", Params: []gcode.ParamDef{{Key: "NAME"}, {Key: "MOVE"}, {Key: "MOVE_SPEED"}}})
-	d.Register(gcode.CommandDef{Name: "SET_PRINT_STATS_INFO", Description: "report layer progress", Params: []gcode.ParamDef{{Key: "TOTAL_LAYER"}, {Key: "CURRENT_LAYER"}}})
-
-	return d
+	return marlin.Dialect().Extend("klipper").
+		Register(gcode.NewCommand("SET_PRESSURE_ADVANCE").Describe("set extruder pressure advance").Optional("ADVANCE", "SMOOTH_TIME", "EXTRUDER")).
+		Register(gcode.NewCommand("SET_VELOCITY_LIMIT").Describe("set kinematic limits").Optional("VELOCITY", "ACCEL", "ACCEL_TO_DECEL", "SQUARE_CORNER_VELOCITY")).
+		Register(gcode.NewCommand("SAVE_GCODE_STATE").Describe("snapshot tool state").Optional("NAME")).
+		Register(gcode.NewCommand("RESTORE_GCODE_STATE").Describe("restore tool state").Optional("NAME", "MOVE", "MOVE_SPEED")).
+		Register(gcode.NewCommand("SET_PRINT_STATS_INFO").Describe("report layer progress").Optional("TOTAL_LAYER", "CURRENT_LAYER"))
 }
 
 // WithBedMesh returns a new dialect equal to d plus the Klipper
 // [bed_mesh] commands (BED_MESH_CALIBRATE, BED_MESH_PROFILE,
 // BED_MESH_CLEAR). d is not modified.
 func WithBedMesh(d *gcode.Dialect) *gcode.Dialect {
-	out := d.Extend(d.Name())
-	out.Register(gcode.CommandDef{Name: "BED_MESH_CALIBRATE", Description: "probe and store bed mesh"})
-	out.Register(gcode.CommandDef{Name: "BED_MESH_PROFILE", Description: "load/save/remove a bed mesh profile", Params: []gcode.ParamDef{{Key: "LOAD"}, {Key: "SAVE"}, {Key: "REMOVE"}}})
-	out.Register(gcode.CommandDef{Name: "BED_MESH_CLEAR", Description: "clear active bed mesh"})
-	return out
+	return d.Extend(d.Name()).
+		Register(gcode.NewCommand("BED_MESH_CALIBRATE").Describe("probe and store bed mesh")).
+		Register(gcode.NewCommand("BED_MESH_PROFILE").Describe("load/save/remove a bed mesh profile").Optional("LOAD", "SAVE", "REMOVE")).
+		Register(gcode.NewCommand("BED_MESH_CLEAR").Describe("clear active bed mesh"))
 }
 
 // WithExcludeObject returns a new dialect equal to d plus the Klipper
 // [exclude_object] commands (EXCLUDE_OBJECT_DEFINE, EXCLUDE_OBJECT_START,
 // EXCLUDE_OBJECT_END, EXCLUDE_OBJECT). d is not modified.
 func WithExcludeObject(d *gcode.Dialect) *gcode.Dialect {
-	out := d.Extend(d.Name())
-	out.Register(gcode.CommandDef{Name: "EXCLUDE_OBJECT_DEFINE", Description: "declare a printable object", Params: []gcode.ParamDef{{Key: "NAME", Required: true}, {Key: "CENTER"}, {Key: "POLYGON"}}})
-	out.Register(gcode.CommandDef{Name: "EXCLUDE_OBJECT_START", Description: "begin printing an object", Params: []gcode.ParamDef{{Key: "NAME", Required: true}}})
-	out.Register(gcode.CommandDef{Name: "EXCLUDE_OBJECT_END", Description: "end printing an object", Params: []gcode.ParamDef{{Key: "NAME"}}})
-	out.Register(gcode.CommandDef{Name: "EXCLUDE_OBJECT", Description: "toggle object exclusion", Params: []gcode.ParamDef{{Key: "NAME"}, {Key: "CURRENT"}, {Key: "RESET"}}})
-	return out
+	return d.Extend(d.Name()).
+		Register(gcode.NewCommand("EXCLUDE_OBJECT_DEFINE").Describe("declare a printable object").Required("NAME").Optional("CENTER", "POLYGON")).
+		Register(gcode.NewCommand("EXCLUDE_OBJECT_START").Describe("begin printing an object").Required("NAME")).
+		Register(gcode.NewCommand("EXCLUDE_OBJECT_END").Describe("end printing an object").Optional("NAME")).
+		Register(gcode.NewCommand("EXCLUDE_OBJECT").Describe("toggle object exclusion").Optional("NAME", "CURRENT", "RESET"))
 }
 
 // WithFanGeneric returns a new dialect equal to d plus the SET_FAN_SPEED
 // command supplied by Klipper's [fan_generic] config sections.
 // d is not modified.
 func WithFanGeneric(d *gcode.Dialect) *gcode.Dialect {
-	out := d.Extend(d.Name())
-	out.Register(gcode.CommandDef{Name: "SET_FAN_SPEED", Description: "set named fan speed", Params: []gcode.ParamDef{{Key: "FAN", Required: true}, {Key: "SPEED"}}})
-	return out
+	return d.Extend(d.Name()).
+		Register(gcode.NewCommand("SET_FAN_SPEED").Describe("set named fan speed").Required("FAN").Optional("SPEED"))
 }
 
 // WithTimelapse returns a new dialect equal to d plus the
 // TIMELAPSE_TAKE_FRAME command supplied by the moonraker-timelapse
 // plugin. d is not modified.
 func WithTimelapse(d *gcode.Dialect) *gcode.Dialect {
-	out := d.Extend(d.Name())
-	out.Register(gcode.CommandDef{Name: "TIMELAPSE_TAKE_FRAME", Description: "trigger timelapse frame"})
-	return out
+	return d.Extend(d.Name()).
+		Register(gcode.NewCommand("TIMELAPSE_TAKE_FRAME").Describe("trigger timelapse frame"))
 }

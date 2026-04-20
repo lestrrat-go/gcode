@@ -16,13 +16,10 @@ var dialect = build()
 func Dialect() *gcode.Dialect { return dialect }
 
 func build() *gcode.Dialect {
-	d := marlin.Dialect().Extend("reprap")
-
-	d.Register(gcode.CommandDef{Name: "G10", Description: "retract / set tool offset", Params: []gcode.ParamDef{{Key: "R"}, {Key: "S"}, {Key: "X"}, {Key: "Y"}, {Key: "Z"}}})
-	d.Register(gcode.CommandDef{Name: "G11", Description: "unretract", Params: []gcode.ParamDef{}})
-	d.Register(gcode.CommandDef{Name: "M116", Description: "wait for temperatures", Params: []gcode.ParamDef{}})
-	d.Register(gcode.CommandDef{Name: "M557", Description: "define print bed mesh", Params: []gcode.ParamDef{{Key: "X"}, {Key: "Y"}, {Key: "R"}, {Key: "S"}}})
-	d.Register(gcode.CommandDef{Name: "M558", Description: "set probe type", Params: []gcode.ParamDef{{Key: "P"}, {Key: "R"}, {Key: "S"}}})
-
-	return d
+	return marlin.Dialect().Extend("reprap").
+		Register(gcode.NewCommand("G10").Describe("retract / set tool offset").Optional("R", "S", "X", "Y", "Z")).
+		Register(gcode.NewCommand("G11").Describe("unretract")).
+		Register(gcode.NewCommand("M116").Describe("wait for temperatures")).
+		Register(gcode.NewCommand("M557").Describe("define print bed mesh").Optional("X", "Y", "R", "S")).
+		Register(gcode.NewCommand("M558").Describe("set probe type").Optional("P", "R", "S"))
 }

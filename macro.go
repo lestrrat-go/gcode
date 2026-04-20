@@ -60,11 +60,13 @@ func NewMacroRegistry() *MacroRegistry {
 	return &MacroRegistry{macros: make(map[string]Macro)}
 }
 
-// Register adds or replaces a macro in the registry.
-func (r *MacroRegistry) Register(m Macro) {
+// Register adds or replaces a macro in the registry and returns r so
+// calls can be chained.
+func (r *MacroRegistry) Register(m Macro) *MacroRegistry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.macros[m.Name()] = m
+	return r
 }
 
 // Lookup returns the named macro and true, or nil and false if not found.
