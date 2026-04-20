@@ -10,18 +10,10 @@ import (
 
 func TestSimpleMacroExpand(t *testing.T) {
 	t.Parallel()
-	lines := []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{Name: "G28"}},
-		{HasCommand: true, Command: gcode.Command{
-			Name: "G1",
-			Args: []gcode.Argument{
-				{Key: "X", Raw: "10", Number: 10, IsNumeric: true},
-				{Key: "Y", Raw: "20", Number: 20, IsNumeric: true},
-			},
-		}},
-	}
-
-	m := gcode.NewSimpleMacro("home-and-move", lines)
+	m := gcode.NewSimpleMacro("home-and-move",
+		gcode.NewLine("G28"),
+		gcode.NewLine("G1").ArgF("X", 10).ArgF("Y", 20),
+	)
 	require.Equal(t, "home-and-move", m.Name())
 
 	expanded, err := m.Expand(nil)
@@ -34,13 +26,9 @@ func TestSimpleMacroExpand(t *testing.T) {
 
 func TestSimpleMacroExpandIsDeepCopy(t *testing.T) {
 	t.Parallel()
-	lines := []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "G1",
-			Args: []gcode.Argument{{Key: "X", Raw: "10", Number: 10, IsNumeric: true}},
-		}},
-	}
-	m := gcode.NewSimpleMacro("move", lines)
+	m := gcode.NewSimpleMacro("move",
+		gcode.NewLine("G1").ArgF("X", 10),
+	)
 
 	first, err := m.Expand(nil)
 	require.NoError(t, err)
@@ -53,13 +41,10 @@ func TestSimpleMacroExpandIsDeepCopy(t *testing.T) {
 
 func TestMacroRegistryLookupExpand(t *testing.T) {
 	t.Parallel()
-	reg := gcode.NewMacroRegistry()
-	reg.Register(gcode.NewSimpleMacro("preheat", []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "M104",
-			Args: []gcode.Argument{{Key: "S", Raw: "200", Number: 200, IsNumeric: true}},
-		}},
-	}))
+	reg := gcode.NewMacroRegistry().
+		Register(gcode.NewSimpleMacro("preheat",
+			gcode.NewLine("M104").ArgF("S", 200),
+		))
 
 	m, ok := reg.Lookup("preheat")
 	require.True(t, ok)
@@ -86,18 +71,12 @@ func (m *customMacro) Expand(args map[string]float64) ([]gcode.Line, error) {
 	if !ok {
 		return nil, fmt.Errorf("missing required arg X")
 	}
-	return []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "G1",
-			Args: []gcode.Argument{{Key: "X", Raw: fmt.Sprintf("%g", x), Number: x, IsNumeric: true}},
-		}},
-	}, nil
+	return []gcode.Line{gcode.NewLine("G1").ArgF("X", x)}, nil
 }
 
 func TestCustomMacro(t *testing.T) {
 	t.Parallel()
-	reg := gcode.NewMacroRegistry()
-	reg.Register(&customMacro{name: "move-x"})
+	reg := gcode.NewMacroRegistry().Register(&customMacro{name: "move-x"})
 
 	expanded, err := reg.Expand("move-x", map[string]float64{"X": 42})
 	require.NoError(t, err)

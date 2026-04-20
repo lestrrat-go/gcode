@@ -7,19 +7,14 @@ import (
 	"github.com/lestrrat-go/gcode"
 )
 
-// ExampleMacroRegistry shows expanding a fixed macro into a stream.
+// ExampleMacroRegistry shows expanding a fixed macro into a stream
+// using the fluent Line constructors.
 func ExampleMacroRegistry() {
-	reg := gcode.NewMacroRegistry()
-	reg.Register(gcode.NewSimpleMacro("preheat-pla", []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "M140",
-			Args: []gcode.Argument{{Key: "S", Raw: "60"}},
-		}},
-		{HasCommand: true, Command: gcode.Command{
-			Name: "M104",
-			Args: []gcode.Argument{{Key: "S", Raw: "200"}},
-		}},
-	}))
+	reg := gcode.NewMacroRegistry().
+		Register(gcode.NewSimpleMacro("preheat-pla",
+			gcode.NewLine("M140").ArgF("S", 60),
+			gcode.NewLine("M104").ArgF("S", 200),
+		))
 
 	expanded, _ := reg.Expand("preheat-pla", nil)
 

@@ -26,7 +26,7 @@ type SimpleMacro struct {
 // NewSimpleMacro returns a SimpleMacro with the given name and lines.
 // The provided lines are deep-copied so subsequent mutations to the
 // caller's slice do not affect the macro.
-func NewSimpleMacro(name string, lines []Line) *SimpleMacro {
+func NewSimpleMacro(name string, lines ...Line) *SimpleMacro {
 	cp := make([]Line, len(lines))
 	for i, l := range lines {
 		cp[i] = l.Clone()
