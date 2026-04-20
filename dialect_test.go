@@ -87,36 +87,69 @@ func TestRepRapDialect(t *testing.T) {
 	require.True(t, ok)
 }
 
-func TestKlipperDialect(t *testing.T) {
+func TestKlipperDialectCore(t *testing.T) {
 	t.Parallel()
 	d := klipper.Dialect()
 	require.Equal(t, "klipper", d.Name())
 
+	// Always-available core extended commands.
 	for _, name := range []string{
-		"G1",
-		"M104",
+		"G1", "M104", // inherited Marlin
+		"SET_PRESSURE_ADVANCE",
+		"SET_VELOCITY_LIMIT",
+		"SAVE_GCODE_STATE",
+		"RESTORE_GCODE_STATE",
+		"SET_PRINT_STATS_INFO",
+	} {
+		_, ok := d.LookupCommand(name)
+		require.True(t, ok, "expected klipper core dialect to define %s", name)
+	}
+
+	// Optional features must NOT be in the core singleton.
+	for _, name := range []string{
+		"BED_MESH_CALIBRATE",
 		"EXCLUDE_OBJECT_DEFINE",
 		"SET_FAN_SPEED",
-		"SET_PRESSURE_ADVANCE",
-		"BED_MESH_PROFILE",
-		"SAVE_GCODE_STATE",
 		"TIMELAPSE_TAKE_FRAME",
 	} {
 		_, ok := d.LookupCommand(name)
-		require.True(t, ok, "expected klipper dialect to define %s", name)
+		require.False(t, ok, "expected %s to be opt-in via With...", name)
 	}
 }
 
-func TestKlipperParsesOrcaSlicerExtended(t *testing.T) {
+func TestKlipperWithHelpersClone(t *testing.T) {
 	t.Parallel()
-	src := `EXCLUDE_OBJECT_DEFINE NAME=Keisuke_MakerChip_id_0_copy_0 CENTER=135.5,136 POLYGON=[[1,2],[3,4]]
-EXCLUDE_OBJECT_START NAME=Keisuke_MakerChip_id_0_copy_0
+
+	base := klipper.Dialect()
+	withMesh := klipper.WithBedMesh(base)
+	withMeshAndExclude := klipper.WithExcludeObject(withMesh)
+
+	// Helpers do not mutate the inputs.
+	_, ok := base.LookupCommand("BED_MESH_CALIBRATE")
+	require.False(t, ok, "WithBedMesh must not mutate input")
+	_, ok = withMesh.LookupCommand("EXCLUDE_OBJECT_DEFINE")
+	require.False(t, ok, "WithExcludeObject must not mutate input")
+
+	// Returned dialects accumulate features.
+	_, ok = withMesh.LookupCommand("BED_MESH_CALIBRATE")
+	require.True(t, ok)
+	_, ok = withMeshAndExclude.LookupCommand("BED_MESH_CALIBRATE")
+	require.True(t, ok)
+	_, ok = withMeshAndExclude.LookupCommand("EXCLUDE_OBJECT_DEFINE")
+	require.True(t, ok)
+}
+
+func TestKlipperParsesExtendedWithOptIn(t *testing.T) {
+	t.Parallel()
+	src := `EXCLUDE_OBJECT_DEFINE NAME=part_0 CENTER=135.5,136 POLYGON=[[1,2],[3,4]]
+EXCLUDE_OBJECT_START NAME=part_0
 G1 X10 Y20
-EXCLUDE_OBJECT_END NAME=Keisuke_MakerChip_id_0_copy_0
+EXCLUDE_OBJECT_END NAME=part_0
 `
+	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader(src),
-		gcode.WithDialect(klipper.Dialect()),
+		gcode.WithDialect(d),
 		gcode.WithStrict(),
 	)
 	count := 0

@@ -200,9 +200,10 @@ func TestReaderStrictUnknownCommand(t *testing.T) {
 
 func TestReaderStrictKnownExtended(t *testing.T) {
 	t.Parallel()
+	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader("EXCLUDE_OBJECT_DEFINE NAME=foo\n"),
-		gcode.WithDialect(klipper.Dialect()),
+		gcode.WithDialect(d),
 		gcode.WithStrict(),
 	)
 	var line gcode.Line

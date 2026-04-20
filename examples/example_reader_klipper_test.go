@@ -9,11 +9,14 @@ import (
 )
 
 // ExampleReader_klipper enables strict parsing against the Klipper
-// dialect, accepting extended commands like EXCLUDE_OBJECT_DEFINE.
+// dialect. EXCLUDE_OBJECT_DEFINE is a config-dependent command, so
+// the [klipper.WithExcludeObject] helper must be applied to the base
+// dialect before strict mode will accept it.
 func ExampleReader_klipper() {
+	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader("EXCLUDE_OBJECT_DEFINE NAME=part_0\n"),
-		gcode.WithDialect(klipper.Dialect()),
+		gcode.WithDialect(d),
 		gcode.WithStrict(),
 	)
 	var line gcode.Line

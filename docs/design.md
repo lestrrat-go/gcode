@@ -233,9 +233,18 @@ type ParamDef struct {
 Built-in dialects:
 - `dialects/marlin` — common G/M codes, T0-T5.
 - `dialects/reprap` — extends marlin with G10/G11/M116/M557/M558.
-- `dialects/klipper` — extends marlin with the Klipper extended commands most often emitted by slicers (`EXCLUDE_OBJECT_*`, `SET_FAN_SPEED`, `SET_PRESSURE_ADVANCE`, `BED_MESH_*`, `SAVE_GCODE_STATE`, `RESTORE_GCODE_STATE`, `TIMELAPSE_TAKE_FRAME`, `SET_PRINT_STATS_INFO`, `SET_VELOCITY_LIMIT`).
+- `dialects/klipper` — extends marlin with **always-available** Klipper core extended commands (`SET_PRESSURE_ADVANCE`, `SET_VELOCITY_LIMIT`, `SAVE_GCODE_STATE`, `RESTORE_GCODE_STATE`, `SET_PRINT_STATS_INFO`).
 
 Each `Dialect()` constructor returns a **shared singleton** initialised at package load. Mutating it (`dialect.Register(...)`) affects every caller. Callers wanting a private extension must call `Extend(name)` to get a flattened mutable child first.
+
+Klipper has many config-dependent and plugin-supplied commands; the `klipper` package exposes them as opt-in helpers that **clone** the input dialect and return a new one (so they never mutate the caller's input):
+
+- `klipper.WithBedMesh(d)` — `BED_MESH_CALIBRATE`, `BED_MESH_PROFILE`, `BED_MESH_CLEAR` (requires `[bed_mesh]`).
+- `klipper.WithExcludeObject(d)` — `EXCLUDE_OBJECT_*` (requires `[exclude_object]`).
+- `klipper.WithFanGeneric(d)` — `SET_FAN_SPEED` (requires `[fan_generic ...]`).
+- `klipper.WithTimelapse(d)` — `TIMELAPSE_TAKE_FRAME` (third-party moonraker-timelapse plugin).
+
+Compose by chaining: `d := klipper.WithExcludeObject(klipper.WithBedMesh(klipper.Dialect()))`.
 
 ### 3.7 Macro
 
