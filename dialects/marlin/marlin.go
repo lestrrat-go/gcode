@@ -7,10 +7,15 @@ import (
 	"github.com/lestrrat-go/gcode"
 )
 
-// Dialect returns a fresh Marlin dialect instance. Each call returns
-// an independent copy that can be modified without affecting other
-// instances.
-func Dialect() *gcode.Dialect {
+var dialect = build()
+
+// Dialect returns the shared Marlin dialect singleton. Mutating it
+// (e.g. via [gcode.Dialect.Register]) affects every caller. To extend
+// with custom commands without disturbing other consumers, call
+// [gcode.Dialect.Extend] to obtain a private child first.
+func Dialect() *gcode.Dialect { return dialect }
+
+func build() *gcode.Dialect {
 	d := gcode.NewDialect("marlin")
 
 	xyze := []gcode.ParamDef{{Key: "X"}, {Key: "Y"}, {Key: "Z"}, {Key: "E"}, {Key: "F"}}

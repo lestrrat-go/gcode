@@ -235,6 +235,8 @@ Built-in dialects:
 - `dialects/reprap` — extends marlin with G10/G11/M116/M557/M558.
 - `dialects/klipper` — extends marlin with the Klipper extended commands most often emitted by slicers (`EXCLUDE_OBJECT_*`, `SET_FAN_SPEED`, `SET_PRESSURE_ADVANCE`, `BED_MESH_*`, `SAVE_GCODE_STATE`, `RESTORE_GCODE_STATE`, `TIMELAPSE_TAKE_FRAME`, `SET_PRINT_STATS_INFO`, `SET_VELOCITY_LIMIT`).
 
+Each `Dialect()` constructor returns a **shared singleton** initialised at package load. Mutating it (`dialect.Register(...)`) affects every caller. Callers wanting a private extension must call `Extend(name)` to get a flattened mutable child first.
+
 ### 3.7 Macro
 
 `Macro` is a single-method interface (`Expand(args map[string]float64) ([]Line, error)`). `SimpleMacro` provides a fixed-line implementation. `MacroRegistry` is a thread-safe collection.

@@ -7,11 +7,15 @@ import (
 	"github.com/lestrrat-go/gcode/dialects/marlin"
 )
 
-// Dialect returns a fresh RepRap dialect instance. Each call returns
-// an independent copy that can be modified without affecting other
-// instances. The dialect inherits all Marlin commands and adds
-// RepRap-specific ones.
-func Dialect() *gcode.Dialect {
+var dialect = build()
+
+// Dialect returns the shared RepRap dialect singleton. The dialect
+// inherits all Marlin commands and adds RepRap-specific ones.
+// Mutating it affects every caller; use [gcode.Dialect.Extend] for a
+// private child.
+func Dialect() *gcode.Dialect { return dialect }
+
+func build() *gcode.Dialect {
 	d := marlin.Dialect().Extend("reprap")
 
 	d.Register(gcode.CommandDef{

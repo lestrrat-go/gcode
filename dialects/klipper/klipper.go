@@ -18,10 +18,15 @@ import (
 	"github.com/lestrrat-go/gcode/dialects/marlin"
 )
 
-// Dialect returns a fresh Klipper dialect instance. Each call returns
-// an independent copy that can be modified without affecting other
-// instances.
-func Dialect() *gcode.Dialect {
+var dialect = build()
+
+// Dialect returns the shared Klipper dialect singleton. The dialect
+// inherits all Marlin commands and adds Klipper-specific extended
+// commands. Mutating it affects every caller; use
+// [gcode.Dialect.Extend] for a private child.
+func Dialect() *gcode.Dialect { return dialect }
+
+func build() *gcode.Dialect {
 	d := marlin.Dialect().Extend("klipper")
 
 	// Object exclusion — emitted per-print by OrcaSlicer and PrusaSlicer.
