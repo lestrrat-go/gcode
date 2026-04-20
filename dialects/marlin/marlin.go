@@ -42,11 +42,7 @@ func build() *gcode.Dialect {
 	d.Register(gcode.CommandDef{Name: "M221", Description: "flow rate %", Params: []gcode.ParamDef{{Key: "S"}}})
 
 	for i := range 6 {
-		d.Register(gcode.CommandDef{
-			Name:        "T" + strconv.Itoa(i),
-			Description: "tool select",
-			Params:      []gcode.ParamDef{},
-		})
+		d.Register(gcode.CommandDef{Name: "T" + strconv.Itoa(i), Description: "tool select", Params: []gcode.ParamDef{}})
 	}
 
 	return d
