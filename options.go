@@ -1,59 +1,52 @@
 package gcode
 
-import "github.com/lestrrat-go/option/v2"
+import "github.com/lestrrat-go/option/v3"
 
-// ParseOption is an option that can be passed to parsing functions.
-type ParseOption interface {
+// ReadOption configures a [Reader].
+type ReadOption interface {
 	option.Interface
-	parseOption()
+	readOption()
 }
 
-// FormatOption is an option that can be passed to generation functions.
-type FormatOption interface {
+// WriteOption configures a [Writer].
+type WriteOption interface {
 	option.Interface
-	formatOption()
+	writeOption()
 }
 
-// Option satisfies both ParseOption and FormatOption.
+// Option satisfies both ReadOption and WriteOption.
 type Option interface {
-	ParseOption
-	FormatOption
+	ReadOption
+	WriteOption
 }
 
-type parseOption struct {
-	option.Interface
-}
+type readOption struct{ option.Interface }
 
-func (*parseOption) parseOption() {}
+func (*readOption) readOption() {}
 
-type formatOption struct {
-	option.Interface
-}
+type writeOption struct{ option.Interface }
 
-func (*formatOption) formatOption() {}
+func (*writeOption) writeOption() {}
 
-type sharedOption struct {
-	option.Interface
-}
+type sharedOption struct{ option.Interface }
 
-func (*sharedOption) parseOption()    {}
-func (*sharedOption) formatOption() {}
+func (*sharedOption) readOption()  {}
+func (*sharedOption) writeOption() {}
 
-// Ident types for option identification.
 type identDialect struct{}
 type identStrict struct{}
 type identEmitComments struct{}
 type identEmitLineNumbers struct{}
 type identComputeChecksum struct{}
 type identLineEnding struct{}
+type identMaxLineSize struct{}
 
-// WithDialect returns an option that associates a dialect with a parse or
-// generate operation.
+// WithDialect attaches a [Dialect] to a Reader or Writer.
 func WithDialect(d *Dialect) Option {
 	return &sharedOption{option.New(identDialect{}, d)}
 }
 
-// LineEnding represents the line ending style used during G-code generation.
+// LineEnding selects the line ending style emitted by a [Writer].
 type LineEnding int
 
 const (

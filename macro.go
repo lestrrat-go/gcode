@@ -6,62 +6,43 @@ import (
 )
 
 // Macro defines a named expansion that produces a sequence of Lines.
-// The library provides SimpleMacro (fixed lines, no substitution) as a
-// convenience. Users who need parameter substitution implement this
-// interface themselves — the Expand method gives full control over how
-// args are used to construct the returned Lines. The library does not
-// provide template markers or expression evaluation; substitution logic
-// is entirely the implementer's responsibility.
+// Use SimpleMacro for a fixed sequence; implement Macro yourself to
+// substitute values from args. The library does not provide template
+// markers or expression evaluation — substitution logic is entirely
+// the implementer's responsibility.
 type Macro interface {
 	Name() string
 	Expand(args map[string]float64) ([]Line, error)
 }
 
-// SimpleMacro is a Macro backed by a fixed slice of Lines.
-// It ignores the args parameter and always returns a deep copy of its
-// stored lines. Use SimpleMacro for fixed command sequences like
-// "preheat PLA" that need no parameter substitution.
+// SimpleMacro is a Macro backed by a fixed slice of Lines that ignores
+// the args parameter. Use it for fixed command sequences (e.g.
+// "preheat PLA") that need no parameter substitution.
 type SimpleMacro struct {
 	name  string
 	lines []Line
 }
 
-// NewSimpleMacro returns a new SimpleMacro with the given name and lines.
-// The provided lines are deep-copied so that subsequent mutations to the
+// NewSimpleMacro returns a SimpleMacro with the given name and lines.
+// The provided lines are deep-copied so subsequent mutations to the
 // caller's slice do not affect the macro.
-func NewSimpleMacro(name string, lines []Line) *SimpleMacro {
+func NewSimpleMacro(name string, lines ...Line) *SimpleMacro {
 	cp := make([]Line, len(lines))
 	for i, l := range lines {
-		if len(l.Command.Params) > 0 {
-			params := make([]Parameter, len(l.Command.Params))
-			copy(params, l.Command.Params)
-			l.Command.Params = params
-		}
-		cp[i] = l
+		cp[i] = l.Clone()
 	}
-	return &SimpleMacro{
-		name:  name,
-		lines: cp,
-	}
+	return &SimpleMacro{name: name, lines: cp}
 }
 
 // Name returns the macro's name.
-func (m *SimpleMacro) Name() string {
-	return m.name
-}
+func (m *SimpleMacro) Name() string { return m.name }
 
-// Expand returns a deep copy of the stored lines. The args parameter is
-// ignored; SimpleMacro always returns the same sequence regardless of
-// arguments.
+// Expand returns a deep copy of the stored lines. The args parameter
+// is ignored.
 func (m *SimpleMacro) Expand(_ map[string]float64) ([]Line, error) {
 	cp := make([]Line, len(m.lines))
 	for i, l := range m.lines {
-		if len(l.Command.Params) > 0 {
-			params := make([]Parameter, len(l.Command.Params))
-			copy(params, l.Command.Params)
-			l.Command.Params = params
-		}
-		cp[i] = l
+		cp[i] = l.Clone()
 	}
 	return cp, nil
 }
@@ -76,16 +57,16 @@ type MacroRegistry struct {
 
 // NewMacroRegistry returns a new empty MacroRegistry.
 func NewMacroRegistry() *MacroRegistry {
-	return &MacroRegistry{
-		macros: make(map[string]Macro),
-	}
+	return &MacroRegistry{macros: make(map[string]Macro)}
 }
 
-// Register adds or replaces a macro in the registry.
-func (r *MacroRegistry) Register(m Macro) {
+// Register adds or replaces a macro in the registry and returns r so
+// calls can be chained.
+func (r *MacroRegistry) Register(m Macro) *MacroRegistry {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.macros[m.Name()] = m
+	return r
 }
 
 // Lookup returns the named macro and true, or nil and false if not found.
@@ -96,8 +77,7 @@ func (r *MacroRegistry) Lookup(name string) (Macro, bool) {
 	return m, ok
 }
 
-// Expand looks up the named macro and calls its Expand method.
-// Returns an error if the macro is not registered.
+// Expand looks up the named macro and invokes its Expand method.
 func (r *MacroRegistry) Expand(name string, args map[string]float64) ([]Line, error) {
 	r.mu.RLock()
 	m, ok := r.macros[name]

@@ -1,191 +1,44 @@
 // Package marlin provides a G-code dialect for Marlin firmware.
 package marlin
 
-import "github.com/lestrrat-go/gcode"
+import (
+	"strconv"
 
-// Dialect returns a fresh Marlin dialect instance. Each call returns an
-// independent copy that can be modified without affecting other instances.
-func Dialect() *gcode.Dialect {
-	d := gcode.NewDialect("marlin")
+	"github.com/lestrrat-go/gcode"
+)
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      0,
-		Description: "rapid move",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'},
-			{Letter: 'E'}, {Letter: 'F'},
-		},
-	})
+var dialect = build()
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      1,
-		Description: "linear move",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'},
-			{Letter: 'E'}, {Letter: 'F'},
-		},
-	})
+// Dialect returns the shared Marlin dialect singleton. Mutating it
+// (e.g. via [gcode.Dialect.Register]) affects every caller. To extend
+// with custom commands without disturbing other consumers, call
+// [gcode.Dialect.Extend] to obtain a private child first.
+func Dialect() *gcode.Dialect { return dialect }
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      4,
-		Description: "dwell",
-		Params: []gcode.ParamDef{
-			{Letter: 'P'}, {Letter: 'S'},
-		},
-	})
+func build() *gcode.Dialect {
+	d := gcode.NewDialect("marlin").
+		Register(gcode.NewCommand("G0").Describe("rapid move").Optional("X", "Y", "Z", "E", "F")).
+		Register(gcode.NewCommand("G1").Describe("linear move").Optional("X", "Y", "Z", "E", "F")).
+		Register(gcode.NewCommand("G4").Describe("dwell").Optional("P", "S")).
+		Register(gcode.NewCommand("G28").Describe("auto home").Optional("X", "Y", "Z")).
+		Register(gcode.NewCommand("G29").Describe("bed levelling")).
+		Register(gcode.NewCommand("G92").Describe("set position").Optional("X", "Y", "Z", "E")).
+		Register(gcode.NewCommand("G92.1").Describe("reset position offset")).
+		Register(gcode.NewCommand("M82").Describe("absolute E")).
+		Register(gcode.NewCommand("M83").Describe("relative E")).
+		Register(gcode.NewCommand("M104").Describe("set hotend temp").Required("S").Optional("T")).
+		Register(gcode.NewCommand("M105").Describe("report temp")).
+		Register(gcode.NewCommand("M106").Describe("fan on").Optional("S", "P")).
+		Register(gcode.NewCommand("M107").Describe("fan off").Optional("P")).
+		Register(gcode.NewCommand("M109").Describe("wait hotend").Required("S").Optional("R", "T")).
+		Register(gcode.NewCommand("M140").Describe("set bed temp").Required("S")).
+		Register(gcode.NewCommand("M190").Describe("wait bed").Required("S").Optional("R")).
+		Register(gcode.NewCommand("M204").Describe("set accel").Optional("P", "R", "T")).
+		Register(gcode.NewCommand("M220").Describe("feed rate %").Optional("S")).
+		Register(gcode.NewCommand("M221").Describe("flow rate %").Optional("S"))
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      28,
-		Description: "auto home",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      29,
-		Description: "bed levelling",
-		Params:      nil, // unconstrained
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      92,
-		Description: "set position",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'}, {Letter: 'E'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      92,
-		Subcode:     1,
-		HasSubcode:  true,
-		Description: "reset position offset",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      82,
-		Description: "absolute E",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      83,
-		Description: "relative E",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      104,
-		Description: "set hotend temp",
-		Params: []gcode.ParamDef{
-			{Letter: 'S', Required: true},
-			{Letter: 'T'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      105,
-		Description: "report temp",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      106,
-		Description: "fan on",
-		Params: []gcode.ParamDef{
-			{Letter: 'S'}, {Letter: 'P'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      107,
-		Description: "fan off",
-		Params: []gcode.ParamDef{
-			{Letter: 'P'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      109,
-		Description: "wait hotend",
-		Params: []gcode.ParamDef{
-			{Letter: 'S', Required: true},
-			{Letter: 'R'},
-			{Letter: 'T'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      140,
-		Description: "set bed temp",
-		Params: []gcode.ParamDef{
-			{Letter: 'S', Required: true},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      190,
-		Description: "wait bed",
-		Params: []gcode.ParamDef{
-			{Letter: 'S', Required: true},
-			{Letter: 'R'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      204,
-		Description: "set accel",
-		Params: []gcode.ParamDef{
-			{Letter: 'P'}, {Letter: 'R'}, {Letter: 'T'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      220,
-		Description: "feed rate %",
-		Params: []gcode.ParamDef{
-			{Letter: 'S'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      221,
-		Description: "flow rate %",
-		Params: []gcode.ParamDef{
-			{Letter: 'S'},
-		},
-	})
-
-	// T0-T5 tool select.
 	for i := range 6 {
-		d.Register(gcode.CommandDef{
-			Letter:      'T',
-			Number:      i,
-			Description: "tool select",
-			Params:      []gcode.ParamDef{},
-		})
+		d.Register(gcode.NewCommand("T" + strconv.Itoa(i)).Describe("tool select"))
 	}
-
 	return d
 }

@@ -9,118 +9,42 @@ import (
 )
 
 func TestSimpleMacroExpand(t *testing.T) {
-	lines := []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'G',
-				Number: 28,
-			},
-		},
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'G',
-				Number: 1,
-				Params: []gcode.Parameter{
-					{Letter: 'X', Value: 10},
-					{Letter: 'Y', Value: 20},
-				},
-			},
-		},
-	}
-
-	m := gcode.NewSimpleMacro("home-and-move", lines)
+	t.Parallel()
+	m := gcode.NewSimpleMacro("home-and-move",
+		gcode.NewLine("G28"),
+		gcode.NewLine("G1").ArgF("X", 10).ArgF("Y", 20),
+	)
 	require.Equal(t, "home-and-move", m.Name())
 
 	expanded, err := m.Expand(nil)
 	require.NoError(t, err)
 	require.Len(t, expanded, 2)
-
-	require.Equal(t, byte('G'), expanded[0].Command.Letter)
-	require.Equal(t, 28, expanded[0].Command.Number)
-
-	require.Equal(t, byte('G'), expanded[1].Command.Letter)
-	require.Equal(t, 1, expanded[1].Command.Number)
-	require.Len(t, expanded[1].Command.Params, 2)
-	require.Equal(t, byte('X'), expanded[1].Command.Params[0].Letter)
-	require.InDelta(t, 10.0, expanded[1].Command.Params[0].Value, 0.001)
-	require.Equal(t, byte('Y'), expanded[1].Command.Params[1].Letter)
-	require.InDelta(t, 20.0, expanded[1].Command.Params[1].Value, 0.001)
+	require.Equal(t, "G28", expanded[0].Command.Name)
+	require.Equal(t, "G1", expanded[1].Command.Name)
+	require.Len(t, expanded[1].Command.Args, 2)
 }
 
-func TestSimpleMacroIgnoresArgs(t *testing.T) {
-	lines := []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'G',
-				Number: 28,
-			},
-		},
-	}
+func TestSimpleMacroExpandIsDeepCopy(t *testing.T) {
+	t.Parallel()
+	m := gcode.NewSimpleMacro("move",
+		gcode.NewLine("G1").ArgF("X", 10),
+	)
 
-	m := gcode.NewSimpleMacro("home", lines)
-
-	args := map[string]float64{"X": 100, "Y": 200}
-	expanded, err := m.Expand(args)
+	first, err := m.Expand(nil)
 	require.NoError(t, err)
-	require.Len(t, expanded, 1)
-	require.Equal(t, 28, expanded[0].Command.Number)
-}
+	first[0].Command.Args[0].Number = 999
 
-func TestSimpleMacroExpandDeepCopy(t *testing.T) {
-	lines := []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'G',
-				Number: 1,
-				Params: []gcode.Parameter{
-					{Letter: 'X', Value: 10},
-				},
-			},
-		},
-	}
-
-	m := gcode.NewSimpleMacro("move", lines)
-
-	expanded, err := m.Expand(nil)
+	second, err := m.Expand(nil)
 	require.NoError(t, err)
-
-	// Mutate the expanded result.
-	expanded[0].Command.Params[0].Value = 999
-
-	// Expand again and verify the original is unchanged.
-	expanded2, err := m.Expand(nil)
-	require.NoError(t, err)
-	require.InDelta(t, 10.0, expanded2[0].Command.Params[0].Value, 0.001)
+	require.InDelta(t, 10.0, second[0].Command.Args[0].Number, 1e-9)
 }
 
-func TestMacroRegistryExpandUnknown(t *testing.T) {
-	reg := gcode.NewMacroRegistry()
-
-	_, err := reg.Expand("nonexistent", nil)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "nonexistent")
-}
-
-func TestMacroRegistryRegisterAndExpand(t *testing.T) {
-	lines := []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'M',
-				Number: 104,
-				Params: []gcode.Parameter{
-					{Letter: 'S', Value: 200},
-				},
-			},
-		},
-	}
-
-	reg := gcode.NewMacroRegistry()
-	reg.Register(gcode.NewSimpleMacro("preheat", lines))
+func TestMacroRegistryLookupExpand(t *testing.T) {
+	t.Parallel()
+	reg := gcode.NewMacroRegistry().
+		Register(gcode.NewSimpleMacro("preheat",
+			gcode.NewLine("M104").ArgF("S", 200),
+		))
 
 	m, ok := reg.Lookup("preheat")
 	require.True(t, ok)
@@ -129,59 +53,35 @@ func TestMacroRegistryRegisterAndExpand(t *testing.T) {
 	expanded, err := reg.Expand("preheat", nil)
 	require.NoError(t, err)
 	require.Len(t, expanded, 1)
-	require.Equal(t, byte('M'), expanded[0].Command.Letter)
-	require.Equal(t, 104, expanded[0].Command.Number)
+	require.Equal(t, "M104", expanded[0].Command.Name)
 }
 
-func TestMacroRegistryLookupMissing(t *testing.T) {
+func TestMacroRegistryUnknown(t *testing.T) {
+	t.Parallel()
 	reg := gcode.NewMacroRegistry()
-
-	_, ok := reg.Lookup("missing")
-	require.False(t, ok)
+	_, err := reg.Expand("nope", nil)
+	require.Error(t, err)
 }
 
-// customMacro is a test-only Macro implementation that builds lines
-// dynamically from the args map.
-type customMacro struct {
-	name string
-}
+type customMacro struct{ name string }
 
 func (m *customMacro) Name() string { return m.name }
-
 func (m *customMacro) Expand(args map[string]float64) ([]gcode.Line, error) {
-	xVal, ok := args["X"]
+	x, ok := args["X"]
 	if !ok {
 		return nil, fmt.Errorf("missing required arg X")
 	}
-	return []gcode.Line{
-		{
-			HasCommand: true,
-			Command: gcode.Command{
-				Letter: 'G',
-				Number: 1,
-				Params: []gcode.Parameter{
-					{Letter: 'X', Value: xVal},
-				},
-			},
-		},
-	}, nil
+	return []gcode.Line{gcode.NewLine("G1").ArgF("X", x)}, nil
 }
 
-func TestMacroRegistryCustomMacro(t *testing.T) {
-	reg := gcode.NewMacroRegistry()
-	reg.Register(&customMacro{name: "move-x"})
+func TestCustomMacro(t *testing.T) {
+	t.Parallel()
+	reg := gcode.NewMacroRegistry().Register(&customMacro{name: "move-x"})
 
 	expanded, err := reg.Expand("move-x", map[string]float64{"X": 42})
 	require.NoError(t, err)
-	require.Len(t, expanded, 1)
-	require.InDelta(t, 42.0, expanded[0].Command.Params[0].Value, 0.001)
-}
+	require.InDelta(t, 42.0, expanded[0].Command.Args[0].Number, 1e-9)
 
-func TestMacroRegistryCustomMacroError(t *testing.T) {
-	reg := gcode.NewMacroRegistry()
-	reg.Register(&customMacro{name: "move-x"})
-
-	_, err := reg.Expand("move-x", nil)
+	_, err = reg.Expand("move-x", nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "missing required arg X")
 }

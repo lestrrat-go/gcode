@@ -1,4 +1,5 @@
 package gcode
 
-// TestMakeParseError exposes makeParseError for use in external tests.
-var TestMakeParseError = makeParseError
+// MakeParseErrorForTest exposes the internal parse-error constructor
+// to tests in the gcode_test package.
+var MakeParseErrorForTest = makeParseError

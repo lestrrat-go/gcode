@@ -1,5 +1,5 @@
-// Package reprap provides a G-code dialect for RepRap firmware.
-// It extends the Marlin dialect with RepRap-specific commands.
+// Package reprap provides a G-code dialect for RepRap firmware,
+// extending [marlin] with RepRap-specific commands.
 package reprap
 
 import (
@@ -7,54 +7,19 @@ import (
 	"github.com/lestrrat-go/gcode/dialects/marlin"
 )
 
-// Dialect returns a fresh RepRap dialect instance. Each call returns an
-// independent copy that can be modified without affecting other instances.
-// The dialect inherits all Marlin commands and adds RepRap-specific ones.
-func Dialect() *gcode.Dialect {
-	d := marlin.Dialect().Extend("reprap")
+var dialect = build()
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      10,
-		Description: "retract/set tool offset",
-		Params: []gcode.ParamDef{
-			{Letter: 'R'}, {Letter: 'S'},
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'},
-		},
-	})
+// Dialect returns the shared RepRap dialect singleton. The dialect
+// inherits all Marlin commands and adds RepRap-specific ones.
+// Mutating it affects every caller; use [gcode.Dialect.Extend] for a
+// private child.
+func Dialect() *gcode.Dialect { return dialect }
 
-	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      11,
-		Description: "unretract",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      116,
-		Description: "wait for temperatures",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      557,
-		Description: "define print bed mesh",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'},
-			{Letter: 'R'}, {Letter: 'S'},
-		},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      558,
-		Description: "set probe type",
-		Params: []gcode.ParamDef{
-			{Letter: 'P'}, {Letter: 'R'}, {Letter: 'S'},
-		},
-	})
-
-	return d
+func build() *gcode.Dialect {
+	return marlin.Dialect().Extend("reprap").
+		Register(gcode.NewCommand("G10").Describe("retract / set tool offset").Optional("R", "S", "X", "Y", "Z")).
+		Register(gcode.NewCommand("G11").Describe("unretract")).
+		Register(gcode.NewCommand("M116").Describe("wait for temperatures")).
+		Register(gcode.NewCommand("M557").Describe("define print bed mesh").Optional("X", "Y", "R", "S")).
+		Register(gcode.NewCommand("M558").Describe("set probe type").Optional("P", "R", "S"))
 }
