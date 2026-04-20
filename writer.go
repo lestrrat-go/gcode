@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"io"
 	"strconv"
+
+	"github.com/lestrrat-go/option/v3"
 )
 
 // Writer streams G-code lines to an [io.Writer]. It is buffered;
@@ -27,13 +29,13 @@ func NewWriter(w io.Writer, opts ...WriteOption) *Writer {
 	for _, opt := range opts {
 		switch opt.Ident() {
 		case identEmitComments{}:
-			_ = opt.Value(&wr.emitComments)
+			wr.emitComments = option.MustGet[bool](opt)
 		case identEmitLineNumbers{}:
-			_ = opt.Value(&wr.emitLineNumbers)
+			wr.emitLineNumbers = option.MustGet[bool](opt)
 		case identComputeChecksum{}:
-			_ = opt.Value(&wr.computeChecksum)
+			wr.computeChecksum = option.MustGet[bool](opt)
 		case identLineEnding{}:
-			_ = opt.Value(&wr.lineEnding)
+			wr.lineEnding = option.MustGet[LineEnding](opt)
 		}
 	}
 	return wr

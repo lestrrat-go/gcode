@@ -1,6 +1,6 @@
 package gcode
 
-import "github.com/lestrrat-go/option/v2"
+import "github.com/lestrrat-go/option/v3"
 
 // WithEmitComments controls whether the [Writer] emits comments.
 // Default: true.

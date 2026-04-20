@@ -39,7 +39,7 @@ Key design decisions:
 - **Concurrency**: `Reader`, `Writer`, `Macro`, and `Dialect` mutating operations are not concurrent-safe and require external synchronisation. `MacroRegistry.Lookup` / `Expand` and `DialectRegistry.Lookup` are concurrent-read-safe.
 - **Per-line invariant**: lines returned by `Reader.Read` share the Reader's internal buffer. They are valid only until the next `Read` call; callers must use `Line.Clone` to retain.
 - **Errors**: `errors.Is(err, ErrParse)` matches all parse errors; `errors.As` extracts a `ParseErrorDetail` with line/column/text.
-- **Dependencies**: only `github.com/lestrrat-go/option/v2` and `github.com/stretchr/testify` (test-only).
+- **Dependencies**: only `github.com/lestrrat-go/option/v3` and `github.com/stretchr/testify` (test-only).
 
 ### 2.3 Constraints and Assumptions
 

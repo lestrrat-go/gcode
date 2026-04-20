@@ -1,6 +1,6 @@
 package gcode
 
-import "github.com/lestrrat-go/option/v2"
+import "github.com/lestrrat-go/option/v3"
 
 // ReadOption configures a [Reader].
 type ReadOption interface {

@@ -8,6 +8,8 @@ import (
 	"iter"
 	"strconv"
 	"unsafe"
+
+	"github.com/lestrrat-go/option/v3"
 )
 
 // defaultMaxLineSize bounds the longest single source line the Reader
@@ -41,16 +43,11 @@ func NewReader(r io.Reader, opts ...ReadOption) *Reader {
 	for _, opt := range opts {
 		switch opt.Ident() {
 		case identDialect{}:
-			var v any
-			if err := opt.Value(&v); err == nil {
-				if d, ok := v.(*Dialect); ok {
-					rd.dialect = d
-				}
-			}
+			rd.dialect = option.MustGet[*Dialect](opt)
 		case identStrict{}:
-			_ = opt.Value(&rd.strict)
+			rd.strict = option.MustGet[bool](opt)
 		case identMaxLineSize{}:
-			_ = opt.Value(&maxSize)
+			maxSize = option.MustGet[int](opt)
 		}
 	}
 	rd.sc.Buffer(make([]byte, 4096), maxSize)

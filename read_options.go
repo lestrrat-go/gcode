@@ -1,6 +1,6 @@
 package gcode
 
-import "github.com/lestrrat-go/option/v2"
+import "github.com/lestrrat-go/option/v3"
 
 // WithStrict enables strict parsing mode on the [Reader]. When a
 // [Dialect] is also attached, unknown commands cause [Reader.Read]
