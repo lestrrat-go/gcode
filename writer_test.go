@@ -23,14 +23,8 @@ func writeAll(t *testing.T, lines []gcode.Line, opts ...gcode.WriteOption) strin
 func TestWriterClassic(t *testing.T) {
 	t.Parallel()
 	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{Name: "G28"}},
-		{HasCommand: true, Command: gcode.Command{
-			Name: "G1",
-			Args: []gcode.Argument{
-				{Key: "X", Raw: "10"},
-				{Key: "Y", Raw: "20"},
-			},
-		}},
+		gcode.NewLine("G28"),
+		gcode.NewLine("G1").Arg("X", "10").Arg("Y", "20"),
 	})
 	require.Equal(t, "G28\nG1 X10 Y20\n", out)
 }
@@ -38,13 +32,7 @@ func TestWriterClassic(t *testing.T) {
 func TestWriterExtended(t *testing.T) {
 	t.Parallel()
 	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "SET_FAN_SPEED",
-			Args: []gcode.Argument{
-				{Key: "FAN", Raw: "cooling"},
-				{Key: "SPEED", Raw: "0.5"},
-			},
-		}},
+		gcode.NewLine("SET_FAN_SPEED").Arg("FAN", "cooling").Arg("SPEED", "0.5"),
 	})
 	require.Equal(t, "SET_FAN_SPEED FAN=cooling SPEED=0.5\n", out)
 }
@@ -52,9 +40,7 @@ func TestWriterExtended(t *testing.T) {
 func TestWriterExtendedFlag(t *testing.T) {
 	t.Parallel()
 	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{
-			Name: "TIMELAPSE_TAKE_FRAME",
-		}},
+		gcode.NewLine("TIMELAPSE_TAKE_FRAME"),
 	})
 	require.Equal(t, "TIMELAPSE_TAKE_FRAME\n", out)
 }
@@ -62,7 +48,7 @@ func TestWriterExtendedFlag(t *testing.T) {
 func TestWriterCommentOnly(t *testing.T) {
 	t.Parallel()
 	out := writeAll(t, []gcode.Line{
-		{HasComment: true, Comment: gcode.Comment{Text: " hello", Form: gcode.CommentSemicolon}},
+		gcode.NewComment(" hello"),
 	})
 	require.Equal(t, "; hello\n", out)
 }
@@ -70,8 +56,7 @@ func TestWriterCommentOnly(t *testing.T) {
 func TestWriterTrailingComment(t *testing.T) {
 	t.Parallel()
 	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{Name: "G28"},
-			HasComment: true, Comment: gcode.Comment{Text: " home", Form: gcode.CommentSemicolon}},
+		gcode.NewLine("G28").WithComment(" home"),
 	})
 	require.Equal(t, "G28 ; home\n", out)
 }
@@ -84,12 +69,8 @@ func TestWriterBlank(t *testing.T) {
 
 func TestWriterLineNumberAndChecksum(t *testing.T) {
 	t.Parallel()
-	out := writeAll(t, []gcode.Line{
-		{LineNumber: 7, HasCommand: true, Command: gcode.Command{
-			Name: "G1",
-			Args: []gcode.Argument{{Key: "X", Raw: "10"}},
-		}},
-	},
+	out := writeAll(t,
+		[]gcode.Line{gcode.NewLine("G1").LineNo(7).Arg("X", "10")},
 		gcode.WithEmitLineNumbers(true),
 		gcode.WithComputeChecksum(true),
 	)
@@ -100,17 +81,18 @@ func TestWriterLineNumberAndChecksum(t *testing.T) {
 
 func TestWriterCRLF(t *testing.T) {
 	t.Parallel()
-	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{Name: "G28"}},
-	}, gcode.WithLineEnding(gcode.LineEndingCRLF))
+	out := writeAll(t,
+		[]gcode.Line{gcode.NewLine("G28")},
+		gcode.WithLineEnding(gcode.LineEndingCRLF),
+	)
 	require.Equal(t, "G28\r\n", out)
 }
 
 func TestWriterEmitCommentsFalse(t *testing.T) {
 	t.Parallel()
-	out := writeAll(t, []gcode.Line{
-		{HasCommand: true, Command: gcode.Command{Name: "G28"},
-			HasComment: true, Comment: gcode.Comment{Text: " home", Form: gcode.CommentSemicolon}},
-	}, gcode.WithEmitComments(false))
+	out := writeAll(t,
+		[]gcode.Line{gcode.NewLine("G28").WithComment(" home")},
+		gcode.WithEmitComments(false),
+	)
 	require.Equal(t, "G28\n", out)
 }
