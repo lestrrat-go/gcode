@@ -1,73 +1,62 @@
 package gcode
 
-// commandKey uniquely identifies a command by its letter, number, and subcode.
-type commandKey struct {
-	Letter  byte
-	Number  int
-	Subcode int // 0 means no subcode (subcode 0 cannot be distinguished from absent)
-}
-
 // ParamDef describes a single parameter that a command accepts.
 type ParamDef struct {
-	Letter      byte
+	// Key is the canonical argument key.
+	// For classic single-letter parameters this is the upper-case letter
+	// as a string ("X", "Y"). For extended commands it is the named
+	// argument identifier ("FAN", "SPEED").
+	Key         string
 	Required    bool
 	Description string
 }
 
 // CommandDef describes a G-code command recognized by a dialect.
+//
+// Name is the canonical command identifier as used on Command.Name —
+// "G28", "M104", "G92.1", or "EXCLUDE_OBJECT_DEFINE".
 type CommandDef struct {
-	Letter      byte
-	Number      int
-	Subcode     int
-	HasSubcode  bool
+	Name        string
 	Description string
-	Params      []ParamDef // nil = unconstrained, empty = no params
+	// Params describes the parameters this command accepts.
+	// nil means unconstrained; an empty slice means no parameters.
+	Params []ParamDef
 }
 
-// Dialect is a named collection of command definitions that describes
-// which G-code commands are recognized and what parameters they accept.
+// Dialect is a named collection of command definitions describing which
+// G-code commands a particular firmware understands and what arguments
+// each one accepts. The Reader can consult a Dialect to validate input
+// when strict mode is enabled.
 type Dialect struct {
 	name     string
-	commands map[commandKey]*CommandDef // flattened, includes inherited
+	commands map[string]*CommandDef
 }
 
-// NewDialect creates a new dialect with the given name and an empty command set.
+// NewDialect creates an empty dialect with the given name.
 func NewDialect(name string) *Dialect {
 	return &Dialect{
 		name:     name,
-		commands: make(map[commandKey]*CommandDef),
+		commands: make(map[string]*CommandDef),
 	}
 }
 
 // Name returns the dialect name.
-func (d *Dialect) Name() string {
-	return d.name
-}
+func (d *Dialect) Name() string { return d.name }
 
-// Register adds a command definition to the dialect. If a command with the
-// same letter, number, and subcode already exists, it is silently overwritten.
+// Register adds a command definition to the dialect. If a command with
+// the same Name already exists it is silently overwritten.
 func (d *Dialect) Register(def CommandDef) {
-	key := commandKey{
-		Letter:  def.Letter,
-		Number:  def.Number,
-		Subcode: def.Subcode,
-	}
-	d.commands[key] = &def
+	d.commands[def.Name] = &def
 }
 
-// LookupCommand returns the command definition for the given letter, number,
-// and subcode. The second return value indicates whether the command was found.
-func (d *Dialect) LookupCommand(letter byte, number int, subcode int) (*CommandDef, bool) {
-	key := commandKey{
-		Letter:  letter,
-		Number:  number,
-		Subcode: subcode,
-	}
-	def, ok := d.commands[key]
+// LookupCommand returns the command definition for the given canonical
+// name and reports whether it was found.
+func (d *Dialect) LookupCommand(name string) (*CommandDef, bool) {
+	def, ok := d.commands[name]
 	return def, ok
 }
 
-// Commands returns all registered command definitions.
+// Commands returns a copy of all registered command definitions.
 func (d *Dialect) Commands() []CommandDef {
 	out := make([]CommandDef, 0, len(d.commands))
 	for _, def := range d.commands {
@@ -76,13 +65,13 @@ func (d *Dialect) Commands() []CommandDef {
 	return out
 }
 
-// Extend creates a new dialect that inherits all commands from this dialect.
-// The returned dialect is independent; registering commands on the child
-// does not affect the parent.
+// Extend creates a child dialect that inherits all commands from this
+// dialect. The returned dialect is independent — registering commands on
+// the child does not affect the parent.
 func (d *Dialect) Extend(name string) *Dialect {
 	child := &Dialect{
 		name:     name,
-		commands: make(map[commandKey]*CommandDef, len(d.commands)),
+		commands: make(map[string]*CommandDef, len(d.commands)),
 	}
 	for k, v := range d.commands {
 		cp := *v

@@ -1,23 +1,55 @@
 package gcode
 
-// Parameter represents a single address-value pair, e.g. X10.5 or S200.
-type Parameter struct {
-	// Letter is the parameter address letter ('X', 'Y', 'Z', 'E', 'F', 'S', etc.).
-	Letter byte
-	// Value is the numeric value of the parameter.
-	Value float64
+// Command is a single G-code command.
+//
+// Name is the canonical command identifier:
+//   - Classic G/M/T codes: letter + number, with optional ".subcode".
+//     Examples: "G28", "M104", "G92.1".
+//   - Extended (Klipper-style) commands: the bare identifier as written.
+//     Examples: "EXCLUDE_OBJECT_DEFINE", "SET_FAN_SPEED".
+//
+// Args are the address-value pairs that follow the command, in source order.
+type Command struct {
+	Name string
+	Args []Argument
 }
 
-// Command represents a single G/M/T (or other letter) code with parameters.
-type Command struct {
-	// Letter is the command letter, e.g. 'G', 'M', 'T'.
-	Letter byte
-	// Number is the numeric portion, e.g. 28 for G28.
-	Number int
-	// Subcode is the subcode after the dot, e.g. 1 for G92.1; 0 means absent.
-	Subcode int
-	// HasSubcode indicates whether a subcode is present.
-	HasSubcode bool
-	// Params holds the address-value pairs following the command code.
-	Params []Parameter
+// Arg returns the first argument whose Key equals key, and true if found.
+// Comparison is case-sensitive against the canonical key.
+func (c Command) Arg(key string) (Argument, bool) {
+	for i := range c.Args {
+		if c.Args[i].Key == key {
+			return c.Args[i], true
+		}
+	}
+	return Argument{}, false
 }
+
+// Argument is one keyed value within a command.
+//
+// Examples (source on the left, struct fields on the right):
+//
+//	X10.5                  Key:"X"        Raw:"10.5"            Number:10.5  IsNumeric:true
+//	X (bare flag)          Key:"X"        Raw:""
+//	FAN=my_fan             Key:"FAN"      Raw:"my_fan"          Number:0     IsNumeric:false
+//	SPEED=0.5              Key:"SPEED"    Raw:"0.5"             Number:0.5   IsNumeric:true
+//	POLYGON=[[1,2],[3,4]]  Key:"POLYGON"  Raw:"[[1,2],[3,4]]"
+//	MSG="hi"               Key:"MSG"      Raw:`"hi"`
+//
+// Key uses single-letter form for classic parameters ("X") and the
+// identifier form for extended commands ("FAN", "POLYGON"). Raw preserves
+// the value's source text verbatim so lists, quoted strings, and other
+// non-numeric forms round-trip exactly. Number is populated only when
+// Raw parses as a finite float; in that case IsNumeric is true.
+//
+// A bare flag — a parameter letter with no following value, as in "G28 X" —
+// is represented by an empty Raw and IsNumeric=false. Use IsFlag to test.
+type Argument struct {
+	Key       string
+	Raw       string
+	Number    float64
+	IsNumeric bool
+}
+
+// IsFlag reports whether the argument is a bare flag (no value).
+func (a Argument) IsFlag() bool { return a.Raw == "" }

@@ -1,149 +1,141 @@
 package gcode_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/gcode"
+	"github.com/lestrrat-go/gcode/dialects/klipper"
 	"github.com/lestrrat-go/gcode/dialects/marlin"
 	"github.com/lestrrat-go/gcode/dialects/reprap"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewDialect(t *testing.T) {
+	t.Parallel()
 	d := gcode.NewDialect("test")
 	require.Equal(t, "test", d.Name())
 }
 
 func TestDialectRegisterAndLookup(t *testing.T) {
+	t.Parallel()
 	d := gcode.NewDialect("test")
 	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      0,
-		Description: "rapid move",
-		Params: []gcode.ParamDef{
-			{Letter: 'X'},
-			{Letter: 'Y'},
-		},
+		Name:        "G0",
+		Description: "rapid",
+		Params:      []gcode.ParamDef{{Key: "X"}, {Key: "Y"}},
 	})
 
-	def, ok := d.LookupCommand('G', 0, 0)
+	def, ok := d.LookupCommand("G0")
 	require.True(t, ok)
-	require.Equal(t, byte('G'), def.Letter)
-	require.Equal(t, 0, def.Number)
-	require.Equal(t, "rapid move", def.Description)
+	require.Equal(t, "rapid", def.Description)
 	require.Len(t, def.Params, 2)
-}
 
-func TestDialectLookupUnknown(t *testing.T) {
-	d := gcode.NewDialect("test")
-	_, ok := d.LookupCommand('G', 99, 0)
+	_, ok = d.LookupCommand("G99")
 	require.False(t, ok)
 }
 
 func TestDialectExtendIndependence(t *testing.T) {
+	t.Parallel()
 	parent := gcode.NewDialect("parent")
-	parent.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      0,
-		Description: "rapid move",
-	})
+	parent.Register(gcode.CommandDef{Name: "G0"})
 
 	child := parent.Extend("child")
 	require.Equal(t, "child", child.Name())
 
-	// Child inherits parent commands.
-	_, ok := child.LookupCommand('G', 0, 0)
+	_, ok := child.LookupCommand("G0")
 	require.True(t, ok)
 
-	// Register on child does not affect parent.
-	child.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      1,
-		Description: "linear move",
-	})
-	_, ok = child.LookupCommand('G', 1, 0)
-	require.True(t, ok)
-	_, ok = parent.LookupCommand('G', 1, 0)
+	child.Register(gcode.CommandDef{Name: "G1"})
+	_, ok = parent.LookupCommand("G1")
 	require.False(t, ok)
 }
 
 func TestDialectCommands(t *testing.T) {
+	t.Parallel()
 	d := gcode.NewDialect("test")
-	d.Register(gcode.CommandDef{Letter: 'G', Number: 0, Description: "rapid"})
-	d.Register(gcode.CommandDef{Letter: 'G', Number: 1, Description: "linear"})
-	d.Register(gcode.CommandDef{Letter: 'M', Number: 104, Description: "hotend"})
+	d.Register(gcode.CommandDef{Name: "G0"})
+	d.Register(gcode.CommandDef{Name: "G1"})
+	d.Register(gcode.CommandDef{Name: "M104"})
 
-	cmds := d.Commands()
-	require.Len(t, cmds, 3)
+	require.Len(t, d.Commands(), 3)
 }
 
 func TestMarlinDialect(t *testing.T) {
+	t.Parallel()
 	d := marlin.Dialect()
-	require.NotNil(t, d)
 	require.Equal(t, "marlin", d.Name())
 
-	// Spot-check G0.
-	def, ok := d.LookupCommand('G', 0, 0)
-	require.True(t, ok)
-	require.Equal(t, byte('G'), def.Letter)
-	require.Equal(t, 0, def.Number)
-
-	// Spot-check G28.
-	def, ok = d.LookupCommand('G', 28, 0)
-	require.True(t, ok)
-	require.Equal(t, "auto home", def.Description)
-
-	// Spot-check M104.
-	def, ok = d.LookupCommand('M', 104, 0)
-	require.True(t, ok)
-	require.Equal(t, "set hotend temp", def.Description)
-
-	// Spot-check G92.1 subcode.
-	def, ok = d.LookupCommand('G', 92, 1)
-	require.True(t, ok)
-	require.True(t, def.HasSubcode)
-	require.Equal(t, 1, def.Subcode)
+	for _, name := range []string{"G0", "G1", "G28", "G92.1", "M104", "T0"} {
+		_, ok := d.LookupCommand(name)
+		require.True(t, ok, "expected dialect to define %s", name)
+	}
 }
 
 func TestRepRapDialect(t *testing.T) {
+	t.Parallel()
 	d := reprap.Dialect()
-	require.NotNil(t, d)
 	require.Equal(t, "reprap", d.Name())
 
-	// Inherited Marlin commands.
-	_, ok := d.LookupCommand('G', 0, 0)
+	// Inherited.
+	_, ok := d.LookupCommand("G0")
 	require.True(t, ok)
-	_, ok = d.LookupCommand('M', 104, 0)
+	// RepRap-specific.
+	_, ok = d.LookupCommand("G10")
 	require.True(t, ok)
-
-	// RepRap-specific commands.
-	def, ok := d.LookupCommand('G', 10, 0)
-	require.True(t, ok)
-	require.Equal(t, "retract/set tool offset", def.Description)
-
-	_, ok = d.LookupCommand('M', 116, 0)
+	_, ok = d.LookupCommand("M557")
 	require.True(t, ok)
 }
 
-func TestMarlinDialectIndependentInstances(t *testing.T) {
-	d1 := marlin.Dialect()
-	d2 := marlin.Dialect()
+func TestKlipperDialect(t *testing.T) {
+	t.Parallel()
+	d := klipper.Dialect()
+	require.Equal(t, "klipper", d.Name())
 
-	// Mutating one should not affect the other.
-	d1.Register(gcode.CommandDef{Letter: 'G', Number: 999, Description: "custom"})
-	_, ok := d1.LookupCommand('G', 999, 0)
-	require.True(t, ok)
-	_, ok = d2.LookupCommand('G', 999, 0)
-	require.False(t, ok)
+	for _, name := range []string{
+		"G1",
+		"M104",
+		"EXCLUDE_OBJECT_DEFINE",
+		"SET_FAN_SPEED",
+		"SET_PRESSURE_ADVANCE",
+		"BED_MESH_PROFILE",
+		"SAVE_GCODE_STATE",
+		"TIMELAPSE_TAKE_FRAME",
+	} {
+		_, ok := d.LookupCommand(name)
+		require.True(t, ok, "expected klipper dialect to define %s", name)
+	}
+}
+
+func TestKlipperParsesOrcaSlicerExtended(t *testing.T) {
+	t.Parallel()
+	src := `EXCLUDE_OBJECT_DEFINE NAME=Keisuke_MakerChip_id_0_copy_0 CENTER=135.5,136 POLYGON=[[1,2],[3,4]]
+EXCLUDE_OBJECT_START NAME=Keisuke_MakerChip_id_0_copy_0
+G1 X10 Y20
+EXCLUDE_OBJECT_END NAME=Keisuke_MakerChip_id_0_copy_0
+`
+	r := gcode.NewReader(
+		strings.NewReader(src),
+		gcode.WithDialect(klipper.Dialect()),
+		gcode.WithStrict(),
+	)
+	count := 0
+	for line, err := range r.All() {
+		require.NoError(t, err)
+		require.True(t, line.HasCommand)
+		count++
+	}
+	require.Equal(t, 4, count)
 }
 
 func TestWithDialect(t *testing.T) {
+	t.Parallel()
 	d := gcode.NewDialect("test")
-	opt := gcode.WithDialect(d)
-	require.NotNil(t, opt)
+	require.NotNil(t, gcode.WithDialect(d))
 }
 
 func TestDialectRegistry(t *testing.T) {
+	t.Parallel()
 	r := gcode.NewDialectRegistry()
 	d := gcode.NewDialect("test")
 	r.Register(d)

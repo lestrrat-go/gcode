@@ -1,5 +1,5 @@
-// Package reprap provides a G-code dialect for RepRap firmware.
-// It extends the Marlin dialect with RepRap-specific commands.
+// Package reprap provides a G-code dialect for RepRap firmware,
+// extending [marlin] with RepRap-specific commands.
 package reprap
 
 import (
@@ -7,52 +7,35 @@ import (
 	"github.com/lestrrat-go/gcode/dialects/marlin"
 )
 
-// Dialect returns a fresh RepRap dialect instance. Each call returns an
-// independent copy that can be modified without affecting other instances.
-// The dialect inherits all Marlin commands and adds RepRap-specific ones.
+// Dialect returns a fresh RepRap dialect instance. Each call returns
+// an independent copy that can be modified without affecting other
+// instances. The dialect inherits all Marlin commands and adds
+// RepRap-specific ones.
 func Dialect() *gcode.Dialect {
 	d := marlin.Dialect().Extend("reprap")
 
 	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      10,
-		Description: "retract/set tool offset",
+		Name:        "G10",
+		Description: "retract / set tool offset",
 		Params: []gcode.ParamDef{
-			{Letter: 'R'}, {Letter: 'S'},
-			{Letter: 'X'}, {Letter: 'Y'}, {Letter: 'Z'},
+			{Key: "R"}, {Key: "S"},
+			{Key: "X"}, {Key: "Y"}, {Key: "Z"},
 		},
 	})
-
+	d.Register(gcode.CommandDef{Name: "G11", Description: "unretract", Params: []gcode.ParamDef{}})
+	d.Register(gcode.CommandDef{Name: "M116", Description: "wait for temperatures", Params: []gcode.ParamDef{}})
 	d.Register(gcode.CommandDef{
-		Letter:      'G',
-		Number:      11,
-		Description: "unretract",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      116,
-		Description: "wait for temperatures",
-		Params:      []gcode.ParamDef{},
-	})
-
-	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      557,
+		Name:        "M557",
 		Description: "define print bed mesh",
 		Params: []gcode.ParamDef{
-			{Letter: 'X'}, {Letter: 'Y'},
-			{Letter: 'R'}, {Letter: 'S'},
+			{Key: "X"}, {Key: "Y"}, {Key: "R"}, {Key: "S"},
 		},
 	})
-
 	d.Register(gcode.CommandDef{
-		Letter:      'M',
-		Number:      558,
+		Name:        "M558",
 		Description: "set probe type",
 		Params: []gcode.ParamDef{
-			{Letter: 'P'}, {Letter: 'R'}, {Letter: 'S'},
+			{Key: "P"}, {Key: "R"}, {Key: "S"},
 		},
 	})
 
