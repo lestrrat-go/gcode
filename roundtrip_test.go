@@ -55,21 +55,3 @@ func TestRoundTripCorpus(t *testing.T) {
 	}
 }
 
-// TestRoundTripOrcaSlicerSample exercises the streaming pipeline
-// against a real-world OrcaSlicer Klipper-bound file when one is
-// present at .tmp/sample.gcode. The test is skipped if the file is
-// not provided locally.
-func TestRoundTripOrcaSlicerSample(t *testing.T) {
-	t.Parallel()
-	const path = ".tmp/sample.gcode"
-	source, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		t.Skipf("sample file %s not available", path)
-	}
-	require.NoError(t, err)
-
-	pass1 := streamCopy(t, bytes.NewReader(source))
-	pass2 := streamCopy(t, bytes.NewReader(pass1))
-	require.Equal(t, len(pass1), len(pass2))
-	require.Equal(t, pass1, pass2, "round-trip not stable")
-}

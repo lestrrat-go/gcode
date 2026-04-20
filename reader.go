@@ -234,22 +234,23 @@ func (r *Reader) parseInto(line *Line) error {
 		}
 
 		if classic {
+			// Free-form-tail tolerance: any non-letter at arg position
+			// (e.g. M117 message text, M118 // comment-style payload)
+			// signals a string-arg command. Bail cleanly; the command
+			// stands as command-only and Line.Raw preserves the source.
 			if !isLetter(c) {
-				return makeParseError(r.lineNum, pos+1, snippet(r.buf, pos),
-					fmt.Errorf("unexpected character %q", c))
+				line.Command.Args = line.Command.Args[:0]
+				pos = len(r.buf)
+				break
 			}
 			// Single-letter classic key.
 			keyStart := pos
 			upperASCII(r.buf[keyStart : keyStart+1])
 			pos++
 
-			// Free-form-text guard: "M117 Hello" — letter followed by another
-			// letter is a string-arg command (M117/M118/M23/M28). We bail out
-			// of structured arg parsing; Line.Raw still has the full source.
+			// Same tolerance: classic key followed by another letter is
+			// a free-form payload (e.g. "M117 Hello").
 			if pos < len(r.buf) && isLetter(r.buf[pos]) {
-				// Discard the structured args we built up; the
-				// command stands as command-only and Line.Raw
-				// preserves the full source for callers that care.
 				line.Command.Args = line.Command.Args[:0]
 				pos = len(r.buf)
 				break
