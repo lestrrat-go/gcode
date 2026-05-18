@@ -7,9 +7,9 @@ import "strconv"
 // comment, and a checksum. Each component is gated by its corresponding
 // HasX field; check those before reading the value.
 //
-// Lines returned by Reader.Read are backed by the Reader's internal
-// buffers and remain valid only until the next Read call. To retain a
-// Line beyond that point, call Clone.
+// Lines returned by [Reader.Read] alias the Reader's internal buffers
+// and become invalid on the next Read — see [Reader.Read] for the full
+// buffer-ownership contract and use [Line.Clone] to retain a Line.
 type Line struct {
 	LineNumber  int
 	Command     Command
