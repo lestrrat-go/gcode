@@ -116,8 +116,12 @@ func (l Line) Arg(key, raw string) Line {
 }
 
 // ArgF returns a copy of l with one numeric Argument appended whose Key
-// is key, Number is v, and Raw is the canonical formatting of v
-// (matching what [Writer] produces). No-op when l carries no command.
+// is key, Number is v, and Raw is the shortest float64 representation
+// of v that round-trips. No-op when l carries no command.
+//
+// ArgF stores the shortest form, which means float64 noise can leak
+// into output. Use [Line.ArgFP] when the call site knows the required
+// decimal precision.
 func (l Line) ArgF(key string, v float64) Line {
 	if !l.HasCommand {
 		return l
@@ -125,6 +129,34 @@ func (l Line) ArgF(key string, v float64) Line {
 	return l.appendArg(Argument{
 		Key:       key,
 		Raw:       strconv.FormatFloat(v, 'f', -1, 64),
+		Number:    v,
+		IsNumeric: true,
+	})
+}
+
+// ArgFP returns a copy of l with one numeric Argument appended whose
+// Key is key, Number is v, and Raw is v formatted at the given
+// decimal precision (matching [strconv.FormatFloat] with the 'f'
+// verb). Use this when output convention demands a specific number of
+// decimal places — for example, slicer-canonical "X10.000" or
+// "E1.03365" — independent of v's underlying float64 representation.
+// No-op when l carries no command.
+//
+// prec values below 0 are clamped to 0; values above 32 are clamped to
+// 32 (the maximum FormatFloat accepts).
+func (l Line) ArgFP(key string, prec int, v float64) Line {
+	if !l.HasCommand {
+		return l
+	}
+	if prec < 0 {
+		prec = 0
+	}
+	if prec > 32 {
+		prec = 32
+	}
+	return l.appendArg(Argument{
+		Key:       key,
+		Raw:       strconv.FormatFloat(v, 'f', prec, 64),
 		Number:    v,
 		IsNumeric: true,
 	})

@@ -113,3 +113,55 @@ func TestLineFluentNoOpWithoutCommand(t *testing.T) {
 	require.False(t, l.HasCommand)
 	require.Empty(t, l.Command.Args)
 }
+
+func TestLineArgFP(t *testing.T) {
+	t.Parallel()
+
+	// 0.1 + 0.2 is the canonical float64-noise case, but Go's
+	// constant-folding evaluates literal `0.1 + 0.2` exactly to 0.3
+	// at compile time. Forcing the addition through variables makes
+	// the compiler emit a runtime float64 add, which produces the
+	// expected bit pattern (0x3FD3333333333334) whose shortest
+	// representation is "0.30000000000000004".
+	a, b := 0.1, 0.2
+	noisy := a + b
+
+	t.Run("ArgF leaks shortest-representation noise", func(t *testing.T) {
+		l := gcode.NewLine("G1").ArgF("E", noisy)
+		require.Equal(t, "0.30000000000000004", l.Command.Args[0].Raw)
+	})
+
+	t.Run("ArgFP formats to fixed decimals", func(t *testing.T) {
+		l := gcode.NewLine("G1").
+			ArgFP("X", 3, 10.1).
+			ArgFP("Y", 3, 20.5).
+			ArgFP("E", 5, noisy).
+			ArgFP("F", 0, 1500)
+
+		require.Equal(t, "10.100", l.Command.Args[0].Raw)
+		require.Equal(t, "20.500", l.Command.Args[1].Raw)
+		require.Equal(t, "0.30000", l.Command.Args[2].Raw)
+		require.Equal(t, "1500", l.Command.Args[3].Raw)
+
+		// Number keeps full float64 precision regardless of Raw format.
+		require.InDelta(t, noisy, l.Command.Args[2].Number, 1e-15)
+		require.True(t, l.Command.Args[2].IsNumeric)
+	})
+
+	t.Run("ArgFP forces decimal places even for whole values", func(t *testing.T) {
+		l := gcode.NewLine("G1").ArgFP("X", 3, 10).ArgFP("F", 0, 1500.7)
+		require.Equal(t, "10.000", l.Command.Args[0].Raw)
+		require.Equal(t, "1501", l.Command.Args[1].Raw)
+	})
+
+	t.Run("negative precision clamps to 0", func(t *testing.T) {
+		l := gcode.NewLine("G1").ArgFP("E", -5, 1.789)
+		require.Equal(t, "2", l.Command.Args[0].Raw)
+	})
+
+	t.Run("no-op without a command", func(t *testing.T) {
+		l := gcode.NewComment(" hi").ArgFP("X", 3, 1.5)
+		require.False(t, l.HasCommand)
+		require.Empty(t, l.Command.Args)
+	})
+}
