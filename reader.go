@@ -85,7 +85,7 @@ func (r *Reader) Read(line *Line) error {
 	r.args = line.Command.Args
 
 	if r.strict && r.dialect != nil && line.HasCommand {
-		if _, ok := r.dialect.LookupCommand(line.Command.Name); !ok {
+		if _, ok := r.dialect.Lookup(line.Command.Name); !ok {
 			return makeParseError(r.lineNum, 1, line.Raw,
 				fmt.Errorf("unknown command %s in dialect %s", line.Command.Name, r.dialect.Name()))
 		}

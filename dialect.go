@@ -102,9 +102,9 @@ func (d *Dialect) Register(def CommandDef) *Dialect {
 	return d
 }
 
-// LookupCommand returns the command definition for the given canonical
+// Lookup returns the command definition for the given canonical
 // name and reports whether it was found.
-func (d *Dialect) LookupCommand(name string) (*CommandDef, bool) {
+func (d *Dialect) Lookup(name string) (*CommandDef, bool) {
 	d.mu.RLock()
 	def, ok := d.commands[name]
 	d.mu.RUnlock()
