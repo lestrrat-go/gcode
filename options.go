@@ -40,6 +40,7 @@ type identEmitLineNumbers struct{}
 type identComputeChecksum struct{}
 type identLineEnding struct{}
 type identMaxLineSize struct{}
+type identArgPrecision struct{}
 
 // WithDialect attaches a [Dialect] to a Reader or Writer.
 func WithDialect(d *Dialect) Option {
