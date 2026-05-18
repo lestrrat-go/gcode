@@ -1,7 +1,9 @@
 package gcode_test
 
 import (
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/lestrrat-go/gcode"
@@ -164,6 +166,35 @@ func TestWithDialect(t *testing.T) {
 	t.Parallel()
 	d := gcode.NewDialect("test")
 	require.NotNil(t, gcode.WithDialect(d))
+}
+
+// TestDialectConcurrent exercises Register and Lookup from many
+// goroutines at once. Without the RWMutex on Dialect this fails under
+// -race with "fatal error: concurrent map read and map write".
+func TestDialectConcurrent(t *testing.T) {
+	t.Parallel()
+	d := gcode.NewDialect("concurrent")
+	const goroutines = 16
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines * 2)
+	for g := range goroutines {
+		go func() {
+			defer wg.Done()
+			for i := range iterations {
+				name := "G" + strconv.Itoa(g*iterations+i)
+				d.Register(gcode.NewCommand(name))
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for i := range iterations {
+				_, _ = d.Lookup("G" + strconv.Itoa(i))
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestDialectRegistry(t *testing.T) {
