@@ -36,7 +36,8 @@ Key design decisions:
 ### 2.2 Non-Functional Requirements
 
 - **Throughput**: parse a 1.7 MB / 62 k-line OrcaSlicer file end-to-end in under 100 ms with bounded memory (~5 MB resident, <10 MB total alloc) on commodity hardware.
-- **Concurrency**: `Reader`, `Writer`, `Macro`, and `Dialect` mutating operations are not concurrent-safe and require external synchronisation. `MacroRegistry.Lookup` / `Expand` and `DialectRegistry.Lookup` are concurrent-read-safe.
+- **Concurrency**: `Reader` and `Writer` are not concurrent-safe and require external synchronisation when shared across goroutines. `Dialect`, `DialectRegistry`, and `MacroRegistry` are fully concurrent-safe (read and write); their internal mutexes serialise access.
+- **Untrusted input**: the Reader's default 16 MiB per-line cap is sized for legitimate Klipper extended commands. Callers streaming untrusted G-code (network upload, third-party file) should tighten this with `WithMaxLineSize` to bound worst-case allocation. Total input size is the caller's responsibility — the library does not bound it.
 - **Per-line invariant**: lines returned by `Reader.Read` share the Reader's internal buffer. They are valid only until the next `Read` call; callers must use `Line.Clone` to retain.
 - **Errors**: `errors.Is(err, ErrParse)` matches all parse errors; `errors.As` extracts a `ParseErrorDetail` with line/column/text.
 - **Dependencies**: only `github.com/lestrrat-go/option/v3` and `github.com/stretchr/testify` (test-only).
@@ -140,6 +141,7 @@ type Command struct {
 }
 
 func (c Command) Arg(key string) (Argument, bool)
+func (c Command) Clone() Command  // detach from Reader buffer
 
 type Argument struct {
     Key       string  // "X" (classic) or "FAN" (extended)
@@ -148,7 +150,8 @@ type Argument struct {
     IsNumeric bool
 }
 
-func (a Argument) IsFlag() bool  // true when Raw == ""
+func (a Argument) IsFlag() bool   // true when Raw == ""
+func (a Argument) Clone() Argument // detach from Reader buffer
 
 type Line struct {
     LineNumber  int
@@ -183,7 +186,7 @@ For each `Read(line *Line)` call:
    - **Arguments:** the grammar follows the command kind. Classic accepts `<letter><number>` or `<letter>` (flag). Extended accepts `<identifier>=<value>` with balanced bracket / quoted value scanning, or a bare `<identifier>` flag.
    - Trailing `(…)` and `;` comments, optional `*<digits>` checksum.
 7. `r.args` is updated to retain the (possibly grown) slab for the next call.
-8. Strict-mode dialect check: if `WithStrict()` and a dialect are set, the canonical `Name` must exist in the dialect.
+8. Strict-mode dialect check: if `WithStrict(d)` was passed, the canonical `Name` must exist in `d`. (`WithStrict` takes the dialect directly; the two concerns are not splittable into separate options.)
 
 `Reader.All() iter.Seq2[Line, error]` wraps `Read` for `range`-loop convenience.
 
@@ -209,9 +212,15 @@ Formatting rules:
 
 ```go
 type Dialect struct {
+    mu       sync.RWMutex
     name     string
     commands map[string]*CommandDef
 }
+
+func (d *Dialect) Lookup(name string) (*CommandDef, bool)
+func (d *Dialect) Register(def CommandDef) *Dialect
+func (d *Dialect) Commands() []CommandDef
+func (d *Dialect) Extend(name string) *Dialect
 
 type CommandDef struct {
     Name        string
@@ -226,7 +235,7 @@ type ParamDef struct {
 }
 ```
 
-`Extend(name)` returns a child dialect with a flattened copy of the parent's command table. Lookups are a single string-keyed map access.
+`Dialect` is fully concurrent-safe: `Lookup` and `Commands` take a read lock; `Register` and `Extend` take a write lock and read lock respectively. `Extend(name)` returns a child dialect with a flattened copy of the parent's command table. Lookups are a single string-keyed map access under the read lock.
 
 `DialectRegistry` is a thread-safe `map[string]*Dialect` for looking up dialects by name.
 
@@ -235,7 +244,7 @@ Built-in dialects:
 - `dialects/reprap` — extends marlin with G10/G11/M116/M557/M558.
 - `dialects/klipper` — extends marlin with **always-available** Klipper core extended commands (`SET_PRESSURE_ADVANCE`, `SET_VELOCITY_LIMIT`, `SAVE_GCODE_STATE`, `RESTORE_GCODE_STATE`, `SET_PRINT_STATS_INFO`).
 
-Each `Dialect()` constructor returns a **shared singleton** initialised at package load. Mutating it (`dialect.Register(...)`) affects every caller. Callers wanting a private extension must call `Extend(name)` to get a flattened mutable child first.
+Each `Dialect()` constructor returns a **shared singleton** initialised at package load. The singleton itself is concurrent-safe, but `Register` on it still mutates the process-wide instance every other caller sees. Callers wanting a private extension must call `Extend(name)` to get a flattened mutable child first.
 
 Klipper has many config-dependent and plugin-supplied commands; the `klipper` package exposes them as opt-in helpers that **clone** the input dialect and return a new one (so they never mutate the caller's input):
 
