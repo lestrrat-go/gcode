@@ -1,5 +1,7 @@
 package gcode
 
+import "sync"
+
 // ParamDef describes a single parameter that a command accepts.
 type ParamDef struct {
 	// Key is the canonical argument key.
@@ -71,7 +73,17 @@ func (c CommandDef) appendParams(required bool, keys []string) CommandDef {
 // G-code commands a particular firmware understands and what arguments
 // each one accepts. The Reader can consult a Dialect to validate input
 // when strict mode is enabled.
+//
+// All methods are safe for concurrent use.
+//
+// The Dialect() functions in the built-in dialect subpackages
+// (marlin, reprap, klipper) return shared, process-wide singletons.
+// Calling [Dialect.Register] on a singleton mutates the dialect every
+// other caller in the program sees. Code that wants to add commands
+// for its own use must first call [Dialect.Extend] to obtain a private
+// child dialect, then register on the child.
 type Dialect struct {
+	mu       sync.RWMutex
 	name     string
 	commands map[string]*CommandDef
 }
@@ -91,19 +103,25 @@ func (d *Dialect) Name() string { return d.name }
 // calls can be chained. If a command with the same Name already exists
 // it is silently overwritten.
 func (d *Dialect) Register(def CommandDef) *Dialect {
+	d.mu.Lock()
 	d.commands[def.Name] = &def
+	d.mu.Unlock()
 	return d
 }
 
-// LookupCommand returns the command definition for the given canonical
+// Lookup returns the command definition for the given canonical
 // name and reports whether it was found.
-func (d *Dialect) LookupCommand(name string) (*CommandDef, bool) {
+func (d *Dialect) Lookup(name string) (*CommandDef, bool) {
+	d.mu.RLock()
 	def, ok := d.commands[name]
+	d.mu.RUnlock()
 	return def, ok
 }
 
 // Commands returns a copy of all registered command definitions.
 func (d *Dialect) Commands() []CommandDef {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	out := make([]CommandDef, 0, len(d.commands))
 	for _, def := range d.commands {
 		out = append(out, *def)
@@ -115,6 +133,8 @@ func (d *Dialect) Commands() []CommandDef {
 // dialect. The returned dialect is independent — registering commands on
 // the child does not affect the parent.
 func (d *Dialect) Extend(name string) *Dialect {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	child := &Dialect{
 		name:     name,
 		commands: make(map[string]*CommandDef, len(d.commands)),

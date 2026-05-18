@@ -1,7 +1,9 @@
 package gcode_test
 
 import (
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/lestrrat-go/gcode"
@@ -26,12 +28,12 @@ func TestDialectRegisterAndLookup(t *testing.T) {
 		Params:      []gcode.ParamDef{{Key: "X"}, {Key: "Y"}},
 	})
 
-	def, ok := d.LookupCommand("G0")
+	def, ok := d.Lookup("G0")
 	require.True(t, ok)
 	require.Equal(t, "rapid", def.Description)
 	require.Len(t, def.Params, 2)
 
-	_, ok = d.LookupCommand("G99")
+	_, ok = d.Lookup("G99")
 	require.False(t, ok)
 }
 
@@ -43,11 +45,11 @@ func TestDialectExtendIndependence(t *testing.T) {
 	child := parent.Extend("child")
 	require.Equal(t, "child", child.Name())
 
-	_, ok := child.LookupCommand("G0")
+	_, ok := child.Lookup("G0")
 	require.True(t, ok)
 
 	child.Register(gcode.CommandDef{Name: "G1"})
-	_, ok = parent.LookupCommand("G1")
+	_, ok = parent.Lookup("G1")
 	require.False(t, ok)
 }
 
@@ -67,7 +69,7 @@ func TestMarlinDialect(t *testing.T) {
 	require.Equal(t, "marlin", d.Name())
 
 	for _, name := range []string{"G0", "G1", "G28", "G92.1", "M104", "T0"} {
-		_, ok := d.LookupCommand(name)
+		_, ok := d.Lookup(name)
 		require.True(t, ok, "expected dialect to define %s", name)
 	}
 }
@@ -78,12 +80,12 @@ func TestRepRapDialect(t *testing.T) {
 	require.Equal(t, "reprap", d.Name())
 
 	// Inherited.
-	_, ok := d.LookupCommand("G0")
+	_, ok := d.Lookup("G0")
 	require.True(t, ok)
 	// RepRap-specific.
-	_, ok = d.LookupCommand("G10")
+	_, ok = d.Lookup("G10")
 	require.True(t, ok)
-	_, ok = d.LookupCommand("M557")
+	_, ok = d.Lookup("M557")
 	require.True(t, ok)
 }
 
@@ -101,7 +103,7 @@ func TestKlipperDialectCore(t *testing.T) {
 		"RESTORE_GCODE_STATE",
 		"SET_PRINT_STATS_INFO",
 	} {
-		_, ok := d.LookupCommand(name)
+		_, ok := d.Lookup(name)
 		require.True(t, ok, "expected klipper core dialect to define %s", name)
 	}
 
@@ -112,7 +114,7 @@ func TestKlipperDialectCore(t *testing.T) {
 		"SET_FAN_SPEED",
 		"TIMELAPSE_TAKE_FRAME",
 	} {
-		_, ok := d.LookupCommand(name)
+		_, ok := d.Lookup(name)
 		require.False(t, ok, "expected %s to be opt-in via With...", name)
 	}
 }
@@ -125,17 +127,17 @@ func TestKlipperWithHelpersClone(t *testing.T) {
 	withMeshAndExclude := klipper.WithExcludeObject(withMesh)
 
 	// Helpers do not mutate the inputs.
-	_, ok := base.LookupCommand("BED_MESH_CALIBRATE")
+	_, ok := base.Lookup("BED_MESH_CALIBRATE")
 	require.False(t, ok, "WithBedMesh must not mutate input")
-	_, ok = withMesh.LookupCommand("EXCLUDE_OBJECT_DEFINE")
+	_, ok = withMesh.Lookup("EXCLUDE_OBJECT_DEFINE")
 	require.False(t, ok, "WithExcludeObject must not mutate input")
 
 	// Returned dialects accumulate features.
-	_, ok = withMesh.LookupCommand("BED_MESH_CALIBRATE")
+	_, ok = withMesh.Lookup("BED_MESH_CALIBRATE")
 	require.True(t, ok)
-	_, ok = withMeshAndExclude.LookupCommand("BED_MESH_CALIBRATE")
+	_, ok = withMeshAndExclude.Lookup("BED_MESH_CALIBRATE")
 	require.True(t, ok)
-	_, ok = withMeshAndExclude.LookupCommand("EXCLUDE_OBJECT_DEFINE")
+	_, ok = withMeshAndExclude.Lookup("EXCLUDE_OBJECT_DEFINE")
 	require.True(t, ok)
 }
 
@@ -149,8 +151,7 @@ EXCLUDE_OBJECT_END NAME=part_0
 	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader(src),
-		gcode.WithDialect(d),
-		gcode.WithStrict(),
+		gcode.WithStrict(d),
 	)
 	count := 0
 	for line, err := range r.All() {
@@ -165,6 +166,35 @@ func TestWithDialect(t *testing.T) {
 	t.Parallel()
 	d := gcode.NewDialect("test")
 	require.NotNil(t, gcode.WithDialect(d))
+}
+
+// TestDialectConcurrent exercises Register and Lookup from many
+// goroutines at once. Without the RWMutex on Dialect this fails under
+// -race with "fatal error: concurrent map read and map write".
+func TestDialectConcurrent(t *testing.T) {
+	t.Parallel()
+	d := gcode.NewDialect("concurrent")
+	const goroutines = 16
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines * 2)
+	for g := range goroutines {
+		go func() {
+			defer wg.Done()
+			for i := range iterations {
+				name := "G" + strconv.Itoa(g*iterations+i)
+				d.Register(gcode.NewCommand(name))
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for i := range iterations {
+				_, _ = d.Lookup("G" + strconv.Itoa(i))
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestDialectRegistry(t *testing.T) {

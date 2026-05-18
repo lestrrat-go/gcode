@@ -45,7 +45,8 @@ func NewReader(r io.Reader, opts ...ReadOption) *Reader {
 		case identDialect{}:
 			rd.dialect = option.MustGet[*Dialect](opt)
 		case identStrict{}:
-			rd.strict = option.MustGet[bool](opt)
+			rd.strict = true
+			rd.dialect = option.MustGet[*Dialect](opt)
 		case identMaxLineSize{}:
 			maxSize = option.MustGet[int](opt)
 		}
@@ -57,10 +58,17 @@ func NewReader(r io.Reader, opts ...ReadOption) *Reader {
 // Read decodes the next line into *line. It returns [io.EOF] when no
 // more lines are available.
 //
-// The fields of *line — including the strings and the Args slice —
-// share storage with the Reader's internal buffers and are
-// invalidated by the next call to Read. To retain a Line, call
-// [Line.Clone].
+// Buffer ownership. To avoid per-line allocations, every string field
+// on the returned Line (Raw, Command.Name, each Argument.Key and
+// Argument.Raw, Comment.Text) and the Command.Args slice itself alias
+// the Reader's internal buffers. They are valid only until the next
+// call to Read on this Reader, after which their contents change in
+// place. Code that stores any of these fields beyond the next Read —
+// including appending the Line to a slice, sending it on a channel,
+// closing over it from a goroutine, or returning it from a function —
+// must first call [Line.Clone] (or [Command.Clone] / [Argument.Clone]
+// for sub-components) to detach storage. Read-then-act-then-discard
+// loops do not need Clone.
 func (r *Reader) Read(line *Line) error {
 	line.reset()
 	if !r.sc.Scan() {
@@ -84,7 +92,7 @@ func (r *Reader) Read(line *Line) error {
 	r.args = line.Command.Args
 
 	if r.strict && r.dialect != nil && line.HasCommand {
-		if _, ok := r.dialect.LookupCommand(line.Command.Name); !ok {
+		if _, ok := r.dialect.Lookup(line.Command.Name); !ok {
 			return makeParseError(r.lineNum, 1, line.Raw,
 				fmt.Errorf("unknown command %s in dialect %s", line.Command.Name, r.dialect.Name()))
 		}

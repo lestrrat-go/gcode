@@ -40,4 +40,13 @@
 // Lines returned by [Reader.Read] are backed by the Reader's internal
 // buffers and remain valid only until the next call to Read; use
 // [Line.Clone] to retain a copy.
+//
+// # Untrusted input
+//
+// The Reader's default per-line cap is 16 MiB — enough to absorb the
+// longest Klipper extended commands observed in practice. Callers that
+// stream G-code from an untrusted source (network upload, third-party
+// file) should tighten this with [WithMaxLineSize] to bound worst-case
+// allocation. The Reader does no other input-size validation; the rest
+// of the file size budget is the caller's responsibility.
 package gcode

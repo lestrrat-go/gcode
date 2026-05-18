@@ -15,8 +15,7 @@ import (
 func ExampleReader_strict() {
 	r := gcode.NewReader(
 		strings.NewReader("G999\n"),
-		gcode.WithDialect(marlin.Dialect()),
-		gcode.WithStrict(),
+		gcode.WithStrict(marlin.Dialect()),
 	)
 	var line gcode.Line
 	err := r.Read(&line)
