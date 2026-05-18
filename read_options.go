@@ -18,6 +18,14 @@ func WithStrict(d *Dialect) ReadOption {
 // line accepted by the [Reader]. Lines longer than this size cause
 // [Reader.Read] to return an error. The default is 16 MiB, which
 // accommodates very long Klipper extended-command lines.
+//
+// Values of n <= 0 are ignored — the default cap applies. (Without
+// this guard, bufio.Scanner would silently raise n to its initial
+// buffer size, surprising callers who passed a deliberately tight or
+// invalid limit.)
 func WithMaxLineSize(n int) ReadOption {
+	if n <= 0 {
+		return &readOption{option.New[int](identMaxLineSize{}, defaultMaxLineSize)}
+	}
 	return &readOption{option.New[int](identMaxLineSize{}, n)}
 }
