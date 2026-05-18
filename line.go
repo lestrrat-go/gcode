@@ -41,18 +41,7 @@ func (l Line) Clone() Line {
 		Raw:         cloneString(l.Raw),
 	}
 	if l.HasCommand {
-		out.Command.Name = cloneString(l.Command.Name)
-		if len(l.Command.Args) > 0 {
-			out.Command.Args = make([]Argument, len(l.Command.Args))
-			for i, a := range l.Command.Args {
-				out.Command.Args[i] = Argument{
-					Key:       cloneString(a.Key),
-					Raw:       cloneString(a.Raw),
-					Number:    a.Number,
-					IsNumeric: a.IsNumeric,
-				}
-			}
-		}
+		out.Command = l.Command.Clone()
 	}
 	if l.HasComment {
 		out.Comment = Comment{

@@ -25,6 +25,21 @@ func (c Command) Arg(key string) (Argument, bool) {
 	return Argument{}, false
 }
 
+// Clone returns a deep copy of c with detached storage. Use this to
+// retain a Command extracted from a Line returned by [Reader.Read] past
+// the next Read call; without Clone the string fields still alias the
+// Reader's internal buffer.
+func (c Command) Clone() Command {
+	out := Command{Name: cloneString(c.Name)}
+	if len(c.Args) > 0 {
+		out.Args = make([]Argument, len(c.Args))
+		for i, a := range c.Args {
+			out.Args[i] = a.Clone()
+		}
+	}
+	return out
+}
+
 // Argument is one keyed value within a command.
 //
 // Examples (source on the left, struct fields on the right):
@@ -53,3 +68,16 @@ type Argument struct {
 
 // IsFlag reports whether the argument is a bare flag (no value).
 func (a Argument) IsFlag() bool { return a.Raw == "" }
+
+// Clone returns a deep copy of a with detached storage. Use this to
+// retain an Argument extracted from a Line returned by [Reader.Read]
+// past the next Read call; without Clone the Key and Raw strings still
+// alias the Reader's internal buffer.
+func (a Argument) Clone() Argument {
+	return Argument{
+		Key:       cloneString(a.Key),
+		Raw:       cloneString(a.Raw),
+		Number:    a.Number,
+		IsNumeric: a.IsNumeric,
+	}
+}
