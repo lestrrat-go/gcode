@@ -75,6 +75,13 @@ func (c CommandDef) appendParams(required bool, keys []string) CommandDef {
 // when strict mode is enabled.
 //
 // All methods are safe for concurrent use.
+//
+// The Dialect() functions in the built-in dialect subpackages
+// (marlin, reprap, klipper) return shared, process-wide singletons.
+// Calling [Dialect.Register] on a singleton mutates the dialect every
+// other caller in the program sees. Code that wants to add commands
+// for its own use must first call [Dialect.Extend] to obtain a private
+// child dialect, then register on the child.
 type Dialect struct {
 	mu       sync.RWMutex
 	name     string
