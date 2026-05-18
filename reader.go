@@ -45,7 +45,8 @@ func NewReader(r io.Reader, opts ...ReadOption) *Reader {
 		case identDialect{}:
 			rd.dialect = option.MustGet[*Dialect](opt)
 		case identStrict{}:
-			rd.strict = option.MustGet[bool](opt)
+			rd.strict = true
+			rd.dialect = option.MustGet[*Dialect](opt)
 		case identMaxLineSize{}:
 			maxSize = option.MustGet[int](opt)
 		}

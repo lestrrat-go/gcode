@@ -189,8 +189,7 @@ func TestReaderStrictUnknownCommand(t *testing.T) {
 	t.Parallel()
 	r := gcode.NewReader(
 		strings.NewReader("G999\n"),
-		gcode.WithDialect(marlin.Dialect()),
-		gcode.WithStrict(),
+		gcode.WithStrict(marlin.Dialect()),
 	)
 	var line gcode.Line
 	err := r.Read(&line)
@@ -203,8 +202,7 @@ func TestReaderStrictKnownExtended(t *testing.T) {
 	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader("EXCLUDE_OBJECT_DEFINE NAME=foo\n"),
-		gcode.WithDialect(d),
-		gcode.WithStrict(),
+		gcode.WithStrict(d),
 	)
 	var line gcode.Line
 	require.NoError(t, r.Read(&line))

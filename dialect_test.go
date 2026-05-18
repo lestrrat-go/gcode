@@ -149,8 +149,7 @@ EXCLUDE_OBJECT_END NAME=part_0
 	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader(src),
-		gcode.WithDialect(d),
-		gcode.WithStrict(),
+		gcode.WithStrict(d),
 	)
 	count := 0
 	for line, err := range r.All() {

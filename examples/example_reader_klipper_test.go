@@ -16,8 +16,7 @@ func ExampleReader_klipper() {
 	d := klipper.WithExcludeObject(klipper.Dialect())
 	r := gcode.NewReader(
 		strings.NewReader("EXCLUDE_OBJECT_DEFINE NAME=part_0\n"),
-		gcode.WithDialect(d),
-		gcode.WithStrict(),
+		gcode.WithStrict(d),
 	)
 	var line gcode.Line
 	if err := r.Read(&line); err != nil {
