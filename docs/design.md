@@ -122,8 +122,7 @@ github.com/lestrrat-go/gcode/
 ├── options.go            ReadOption / WriteOption / Option type system
 ├── read_options.go       WithStrict, WithMaxLineSize
 ├── write_options.go      WithEmitComments, WithEmitLineNumbers,
-│                         WithComputeChecksum, WithLineEnding,
-│                         WithArgPrecision
+│                         WithComputeChecksum, WithLineEnding
 ├── dialects/
 │   ├── marlin/marlin.go
 │   ├── reprap/reprap.go  (extends marlin)
@@ -206,7 +205,7 @@ Formatting rules:
 - Optional trailing `; comment` or ` (comment)` when `WithEmitComments(true)`.
 - Optional `*<checksum>` suffix when `WithComputeChecksum(true)`. Checksum is the XOR of the formatted body bytes.
 - Line endings: `\n` (default) or `\r\n` (`WithLineEnding(LineEndingCRLF)`).
-- Numeric argument formatting: by default `Argument.Raw` is written verbatim, preserving round-trip fidelity. `WithArgPrecision(map[string]int{"E":5,"X":3,...})` re-renders each listed numeric argument via `strconv.FormatFloat(Number, 'f', prec, 64)`, so callers that keep full `float64` precision in `Number` can emit canonical slicer-style decimals (E at 5 places, positional axes at 3, F integer) without round-tripping through `float32`. Keys not in the map and non-numeric args are unaffected.
+- Numeric argument formatting: the Writer always emits `Argument.Raw` verbatim, so round-trip fidelity is automatic. Callers that need a specific decimal precision capture it at construction time via `Line.ArgFP(key, prec, v)` — for example `ArgFP("E", 5, e)` — which formats `Raw` with `strconv.FormatFloat(v, 'f', prec, 64)` while storing the full-precision value in `Number`. `Line.ArgF(key, v)` remains available as a shortest-representation convenience. Precision is intentionally NOT a Writer-side option: the letter-to-precision mapping depends on the *command* (e.g. `E` is decimal extruder on `G1` but integer tool-index on `M301`), and that knowledge lives at the call site, not in a global map.
 
 `Writer.Flush()` flushes the buffered writer.
 

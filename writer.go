@@ -17,7 +17,6 @@ type Writer struct {
 	emitLineNumbers bool
 	computeChecksum bool
 	lineEnding      LineEnding
-	argPrecision    map[string]int
 }
 
 // NewWriter returns a Writer that emits G-code lines to w.
@@ -37,8 +36,6 @@ func NewWriter(w io.Writer, opts ...WriteOption) *Writer {
 			wr.computeChecksum = option.MustGet[bool](opt)
 		case identLineEnding{}:
 			wr.lineEnding = option.MustGet[LineEnding](opt)
-		case identArgPrecision{}:
-			wr.argPrecision = option.MustGet[map[string]int](opt)
 		}
 	}
 	return wr
@@ -100,17 +97,16 @@ func (w *Writer) formatBody(line Line) string {
 
 	classic := isClassicName(line.Command.Name)
 	for _, a := range line.Command.Args {
-		raw := w.formatArgValue(a)
 		if classic {
 			sb.writeByte(' ')
 			sb.writeString(a.Key)
-			sb.writeString(raw)
+			sb.writeString(a.Raw)
 		} else {
 			sb.writeByte(' ')
 			sb.writeString(a.Key)
 			if !a.IsFlag() {
 				sb.writeByte('=')
-				sb.writeString(raw)
+				sb.writeString(a.Raw)
 			}
 		}
 	}
@@ -120,22 +116,6 @@ func (w *Writer) formatBody(line Line) string {
 	}
 
 	return sb.String()
-}
-
-// formatArgValue returns the text the Writer should emit for a's
-// value. When [WithArgPrecision] supplies an entry for a.Key and a is
-// numeric, the value is rendered from a.Number at the configured
-// precision; otherwise a.Raw is returned verbatim. Bare flags (Raw
-// already empty) are unaffected.
-func (w *Writer) formatArgValue(a Argument) string {
-	if !a.IsNumeric || a.IsFlag() || w.argPrecision == nil {
-		return a.Raw
-	}
-	prec, ok := w.argPrecision[a.Key]
-	if !ok {
-		return a.Raw
-	}
-	return strconv.FormatFloat(a.Number, 'f', prec, 64)
 }
 
 func writeComment(sb *stringBuilder, c Comment, leadingSpace bool) {
